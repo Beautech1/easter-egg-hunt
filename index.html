@@ -29,6 +29,17 @@
     #infoBar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px}
     .pill{background:rgba(255,255,255,.16);padding:6px 10px;border-radius:999px;font-size:13px}
     #map{flex:1;width:100%}
+    #map.cartoon-map .leaflet-tile{
+      filter:saturate(1.35) hue-rotate(-12deg) brightness(1.05) contrast(1.02);
+    }
+    #map.cartoon-map::after{
+      content:'';
+      position:absolute; inset:0;
+      pointer-events:none;
+      background:radial-gradient(circle at 50% 40%, rgba(255,255,255,.04), rgba(124,255,124,.05) 45%, rgba(0,0,0,0) 70%);
+      z-index:350;
+      mix-blend-mode:multiply;
+    }
     #bottomPanel{
       position:absolute;z-index:1300;left:10px;right:10px;bottom:10px;margin:auto;
       max-width:560px;background:var(--panel);border-radius:18px;padding:12px;box-shadow:var(--shadow)
@@ -38,7 +49,10 @@
     button{
       border:none;border-radius:12px;padding:11px 13px;font-size:14px;font-weight:700;cursor:pointer
     }
-    #captureBtn{flex:1 1 180px;background:linear-gradient(135deg,var(--green),#58d68d);color:#fff}
+    #captureBtn{flex:1 1 180px;background:linear-gradient(135deg,var(--green),#58d68d);color:#fff;transition:transform .18s ease, box-shadow .18s ease, filter .18s ease}
+    #captureBtn.nearby{box-shadow:0 0 0 3px rgba(255,216,77,.28), 0 0 24px rgba(255,216,77,.95), 0 0 50px rgba(255,102,179,.35);filter:saturate(1.18);animation:buttonPulse 1s infinite}
+    #captureBtn.ready{box-shadow:0 0 0 3px rgba(255,255,255,.28), 0 0 22px rgba(47,191,113,.98), 0 0 52px rgba(47,191,113,.55);transform:scale(1.02)}
+    @keyframes buttonPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
     #captureBtn:disabled{background:#cbd5d1;color:#f8f8f8;cursor:not-allowed}
     .btn{background:#f0e9ff;color:#5a32c8}
     #adminPanel{
@@ -61,6 +75,11 @@
     }
     .gps-dot.near{background:var(--red);box-shadow:0 0 0 3px rgba(0,0,0,.12),0 0 22px rgba(255,59,48,.55)}
     .egg-icon{font-size:26px;line-height:30px;text-align:center;filter:drop-shadow(0 2px 3px rgba(0,0,0,.2))}
+    .user-arrow{
+      width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-bottom:22px solid #1b1b1b;
+      filter:drop-shadow(0 1px 2px rgba(255,255,255,.7));
+      transform-origin:50% 70%;
+    }
     .captured-icon{font-size:22px;line-height:28px;text-align:center}
     .leaflet-popup-content-wrapper{border-radius:14px}
     @media (max-width:600px){
@@ -129,6 +148,7 @@
 </div>
 <script>
 const CAPTURE_DISTANCE_METERS = 1;
+const NEARBY_LIGHT_DISTANCE_METERS = 2;
 const JSON_FILE = 'eggs.json';
 const DEFAULT_CENTER = [43.6165, -79.5728];
 const DEFAULT_ZOOM = 18;
@@ -223,6 +243,8 @@ let addMode = false;
 let map, userMarker, accuracyCircle;
 let musicStarted = false;
 let audioCtx = null;
+let currentHeading = null;
+let orientationEnabled = false;
 let userLatLng = null;
 let eggMarkers = [];
 let nearestAvailableEgg = null;
@@ -268,6 +290,15 @@ function makeGpsIcon(isNear){
   });
 }
 
+function makeUserArrowIcon(){
+  return L.divIcon({
+    className:'',
+    html:`<div class="user-arrow"></div>`,
+    iconSize:[20,22],
+    iconAnchor:[10,18]
+  });
+}
+
 function makeEggIcon(captured){
   return L.divIcon({
     className:'',
@@ -307,6 +338,7 @@ function updateProximity(){
   const status = document.getElementById('statusText');
   const captureBtn = document.getElementById('captureBtn');
   nearestAvailableEgg = null;
+  captureBtn.classList.remove('nearby','ready');
 
   if (!userLatLng){
     status.textContent = 'Waiting for GPS location...';
@@ -326,26 +358,31 @@ function updateProximity(){
     }
   });
 
+  const nearGlow = closestEgg && closestDistance <= NEARBY_LIGHT_DISTANCE_METERS;
   const nearEgg = closestEgg && closestDistance <= CAPTURE_DISTANCE_METERS;
   nearestAvailableEgg = nearEgg ? closestEgg : null;
 
-  if (userMarker) userMarker.setIcon(makeGpsIcon(hiddenEggs && nearEgg));
+  if (userMarker) userMarker.setIcon(makeGpsIcon(hiddenEggs && nearGlow));
 
   if (!closestEgg){
     status.textContent = 'You captured all eggs for this player! 🎉';
     captureBtn.disabled = true;
+    showFinalWin();
     return;
   }
 
+  if (nearGlow) captureBtn.classList.add('nearby');
+  if (nearEgg) captureBtn.classList.add('ready');
+
   if (nearEgg){
     status.innerHTML = hiddenEggs
-      ? 'You are near a hidden egg! The GPS dot turned red. Tap <strong>Capture Egg</strong>.'
+      ? 'You are close enough to a hidden egg! The GPS dot turned red. Tap <strong>Capture Egg</strong>.'
       : `You are ${closestDistance.toFixed(1)} m from <strong>${escapeHtml(closestEgg.id)}</strong>. Tap <strong>Capture Egg</strong>.`;
     captureBtn.disabled = false;
   } else {
     status.textContent = hiddenEggs
-      ? `Keep searching. The GPS dot will turn red within ${CAPTURE_DISTANCE_METERS} m of a hidden egg.`
-      : `Closest egg is ${closestDistance.toFixed(1)} m away. Move closer to capture it.`;
+      ? `Keep searching. The GPS dot turns red and the button glows within ${NEARBY_LIGHT_DISTANCE_METERS} m.`
+      : `Closest egg is ${closestDistance.toFixed(1)} m away. The capture button glows within ${NEARBY_LIGHT_DISTANCE_METERS} m.`;
     captureBtn.disabled = true;
   }
 }
@@ -400,8 +437,8 @@ function startBackgroundTune(){
   window._bgLoopTimer = setInterval(() => {
     if (!audioCtx || document.getElementById('bgMusic').dataset.muted === 'true') return;
     const f = pattern[step % pattern.length];
-    playTone(f, 0.22, 'triangle', 0.018, 0);
-    playTone(f / 2, 0.24, 'sine', 0.01, 0);
+    playTone(f, 0.22, 'triangle', 0.038, 0);
+    playTone(f / 2, 0.24, 'sine', 0.022, 0);
     step++;
   }, 320);
 }
@@ -414,11 +451,55 @@ function stopBackgroundTune(){
   }
 }
 
+function applyMapRotation(heading){
+  if (!map || !Number.isFinite(heading)) return;
+  currentHeading = heading;
+  const pane = map.getPane('mapPane');
+  if (!pane) return;
+  pane.style.transformOrigin = '50% 50%';
+  pane.style.transition = 'transform .28s linear';
+  pane.style.transform = `rotate(${-heading}deg)`;
+}
+
+function tryEnableDeviceOrientation(){
+  if (orientationEnabled) return;
+  orientationEnabled = true;
+  const handler = (event) => {
+    let heading = null;
+    if (typeof event.webkitCompassHeading === 'number') {
+      heading = event.webkitCompassHeading;
+    } else if (typeof event.alpha === 'number') {
+      heading = 360 - event.alpha;
+    }
+    if (heading != null && !Number.isNaN(heading)) applyMapRotation(heading);
+  };
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission().then(state => {
+      if (state === 'granted') window.addEventListener('deviceorientation', handler, true);
+    }).catch(() => {});
+  } else if (typeof window.DeviceOrientationEvent !== 'undefined') {
+    window.addEventListener('deviceorientationabsolute', handler, true);
+    window.addEventListener('deviceorientation', handler, true);
+  }
+}
+
 function playCaptureEffects(){
   ensureAudioContext();
   const notes = [523.25, 659.25, 783.99, 1046.5];
-  notes.forEach((n, i) => playTone(n, 0.22, 'triangle', 0.08, i * 0.1));
-  [1567.98, 1318.51, 1760].forEach((n, i) => playTone(n, 0.18, 'square', 0.03, 0.12 + i * 0.08));
+  notes.forEach((n, i) => playTone(n, 0.22, 'triangle', 0.09, i * 0.1));
+  [1567.98, 1318.51, 1760].forEach((n, i) => playTone(n, 0.18, 'square', 0.04, 0.12 + i * 0.08));
+}
+
+function playFinalTrumpets(){
+  ensureAudioContext();
+  const fanfare = [
+    [523.25,0],[659.25,0.16],[783.99,0.32],[1046.5,0.5],
+    [987.77,0.76],[1046.5,0.96],[1318.51,1.18],[1567.98,1.42]
+  ];
+  fanfare.forEach(([n,d]) => {
+    playTone(n, 0.34, 'square', 0.09, d);
+    playTone(n/2, 0.38, 'triangle', 0.045, d);
+  });
 }
 
 function startMusicOnce(){
@@ -446,18 +527,29 @@ function toggleMusic(){
   }
 }
 
-function toggleMusic(){
-  const bgMusic = document.getElementById('bgMusic');
-  if (bgMusic.paused){
-    bgMusic.volume = 0.35;
-    bgMusic.play().then(() => {
-      musicStarted = true;
-      document.getElementById('musicBtn').textContent = 'Music: ON';
-    }).catch(() => {});
-  } else {
-    bgMusic.pause();
-    document.getElementById('musicBtn').textContent = 'Music: OFF';
-  }
+function showFinalWin(){
+  if (window._finalWinShownFor === playerName + '|' + eggsData.length) return;
+  window._finalWinShownFor = playerName + '|' + eggsData.length;
+  const wrap = document.getElementById('celebration');
+  document.getElementById('celebrationCard').innerHTML = `
+      <div style="font-size:64px; margin-bottom:8px;">🏆🥚🎺</div>
+      <h2 style="font-size:36px;">CONGRATULATIONS!</h2>
+      <div id="celebrationMessage" style="font-size:20px;">You captured every egg!</div>
+      <div style="margin-top:12px; font-size:42px;">🐰🌈⭐🎉</div>
+    `;
+  wrap.style.display = 'flex';
+  playFinalTrumpets();
+  spawnConfetti(420);
+  setTimeout(() => {
+    wrap.style.display = 'none';
+    clearConfetti();
+    document.getElementById('celebrationCard').innerHTML = `
+      <div style="font-size:56px; margin-bottom:8px;">🥚✨🎉</div>
+      <h2>Egg Captured!</h2>
+      <div id="celebrationMessage">Amazing job! You found a magical egg.</div>
+      <div style="margin-top:12px; font-size:40px;">🐰🌈⭐</div>
+    `;
+  }, 4200);
 }
 
 function showCelebration(){
@@ -540,7 +632,8 @@ function resetCurrentPlayerCaptures(){
 }
 
 function initMap(){
-  map = L.map('map').setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+  map = L.map('map', { zoomControl:true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+  document.getElementById('map').classList.add('cartoon-map');
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 21,
     maxNativeZoom: 19,
@@ -565,6 +658,7 @@ function initMap(){
         const lng = pos.coords.longitude;
         const accuracy = pos.coords.accuracy || 0;
         userLatLng = L.latLng(lat, lng);
+        if (typeof pos.coords.heading === 'number' && !Number.isNaN(pos.coords.heading)) applyMapRotation(pos.coords.heading);
 
         if (!userMarker) {
           userMarker = L.marker(userLatLng, { icon: makeGpsIcon(false) }).addTo(map);
@@ -584,10 +678,10 @@ function initMap(){
   }
 }
 
-document.getElementById('captureBtn').addEventListener('click', () => { startMusicOnce(); captureNearestEgg(); });
+document.getElementById('captureBtn').addEventListener('click', () => { startMusicOnce(); tryEnableDeviceOrientation(); captureNearestEgg(); });
 document.getElementById('musicBtn').addEventListener('click', (e) => { e.stopPropagation(); toggleMusic(); });
-document.addEventListener('click', startMusicOnce, { once: true, passive: true });
-document.addEventListener('touchstart', startMusicOnce, { once: true, passive: true });
+document.addEventListener('click', () => { startMusicOnce(); tryEnableDeviceOrientation(); }, { once: true, passive: true });
+document.addEventListener('touchstart', () => { startMusicOnce(); tryEnableDeviceOrientation(); }, { once: true, passive: true });
 document.getElementById('centerBtn').addEventListener('click', () => { if (userLatLng) map.setView(userLatLng, 19); });
 document.getElementById('changePlayerBtn').addEventListener('click', () => { askPlayerName(); renderEggs(); updateProximity(); });
 document.getElementById('resetPlayerBtn').addEventListener('click', resetCurrentPlayerCaptures);
