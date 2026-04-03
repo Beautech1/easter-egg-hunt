@@ -19,6 +19,9 @@
       --text: #2e2e3a;
       --shadow: 0 10px 30px rgba(0,0,0,0.18);
       --radius: 18px;
+      --player-pulse-duration: 1.6s;
+      --player-pulse-scale: 1.35;
+      --player-glow: rgba(74,168,255,0.30);
     }
 
     * { box-sizing: border-box; }
@@ -245,23 +248,165 @@
       opacity: 0.6;
     }
 
+    .topbar-header, .quest-header-row {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+
+    .icon-btn {
+      border: 0;
+      border-radius: 999px;
+      width: 38px;
+      height: 38px;
+      min-width: 38px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #ffffff, #f3f3ff);
+      color: var(--text);
+      box-shadow: 0 5px 14px rgba(0,0,0,0.12);
+      cursor: pointer;
+      font-size: 18px;
+    }
+
+    .topbar.compact .small,
+    .topbar.compact .tap-hint,
+    .topbar.compact .player-chip,
+    .topbar.compact .stats,
+    .topbar.compact .controls {
+      display: none;
+    }
+
+    .topbar.compact {
+      width: min(250px, calc(100vw - 24px));
+      padding: 10px 12px;
+    }
+
+    .topbar.compact h1 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .quest-panel.compact {
+      width: min(210px, calc(100vw - 24px));
+      max-height: 68px;
+      overflow: hidden;
+      padding-bottom: 10px;
+    }
+
+    .unlock-tray {
+      position: absolute;
+      left: 50%;
+      bottom: 78px;
+      transform: translateX(-50%);
+      z-index: 1600;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      width: min(340px, calc(100vw - 28px));
+      background: rgba(255,255,255,0.96);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 10px 12px;
+      backdrop-filter: blur(8px);
+    }
+
+    .unlock-tray .small {
+      font-size: 12px;
+      line-height: 1.25;
+    }
+
+    .unlock-tray button {
+      flex: 0 0 auto;
+      padding: 10px 12px;
+    }
+
+    .player-marker {
+      width: 22px;
+      height: 22px;
+      position: relative;
+      transform: translate(-11px, -11px);
+    }
+
+    .player-marker .core {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #ffffff 0 18%, #8ee9ff 19% 35%, #2e7dff 36% 100%);
+      border: 2px solid white;
+      box-shadow: 0 0 0 2px rgba(36,107,255,0.35), 0 0 20px var(--player-glow);
+      position: relative;
+      z-index: 2;
+    }
+
+    .player-marker .pulse {
+      position: absolute;
+      inset: -8px;
+      border-radius: 50%;
+      border: 3px solid rgba(74,168,255,0.65);
+      animation: playerPulse var(--player-pulse-duration) ease-out infinite;
+      transform-origin: center;
+    }
+
+    @keyframes playerPulse {
+      0% { transform: scale(0.85); opacity: 0.95; }
+      75% { transform: scale(var(--player-pulse-scale)); opacity: 0.1; }
+      100% { transform: scale(calc(var(--player-pulse-scale) + 0.1)); opacity: 0; }
+    }
+
+    .proximity-note {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #eefcff, #fff7d6);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+
     @media (max-width: 800px) {
-      .quest-panel {
-        top: auto;
-        bottom: 14px;
-        right: 14px;
-        max-height: 42vh;
+      .topbar {
+        top: 10px;
+        left: 10px;
+        width: min(240px, calc(100vw - 20px));
+        padding: 10px;
       }
 
-      .topbar h1 { font-size: 18px; }
-      .stats { grid-template-columns: repeat(4, 1fr); }
-      .stat { padding: 8px; }
-      .stat strong { font-size: 16px; }
+      .quest-panel {
+        top: auto;
+        bottom: 10px;
+        right: 10px;
+        width: min(230px, calc(100vw - 20px));
+        max-height: 33vh;
+        padding: 10px;
+      }
+
+      .quest-card {
+        padding: 10px;
+        margin-bottom: 8px;
+      }
+
+      .topbar h1 { font-size: 16px; }
+      .stats { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+      .stat { padding: 6px; }
+      .stat strong { font-size: 14px; }
+      .controls { gap: 6px; }
+      button { padding: 8px 10px; font-size: 12px; }
+      .warning-banner { bottom: 12px; font-size: 12px; padding: 10px 12px; }
       #editorPanel {
         top: auto;
-        bottom: 14px;
-        left: 14px;
-        max-height: 48vh;
+        bottom: 10px;
+        left: 10px;
+        width: min(260px, calc(100vw - 20px));
+        max-height: 42vh;
+      }
+      .unlock-tray {
+        bottom: 60px;
+        width: min(300px, calc(100vw - 20px));
+        padding: 8px 10px;
       }
     }
   </style>
@@ -269,8 +414,14 @@
 <body>
   <div id="map"></div>
 
-  <div class="panel topbar">
-    <h1 id="titleTapTarget">🐰 Easter Realm Hunt</h1>
+  <div class="panel topbar" id="topbar">
+    <div class="topbar-header">
+      <h1 id="titleTapTarget">🐰 Easter Realm Hunt</h1>
+      <div style="display:flex; gap:8px;">
+        <button class="icon-btn" id="musicToggleBtn" title="Toggle music">🎵</button>
+        <button class="icon-btn" id="compactTopbarBtn" title="Minimize panel">➖</button>
+      </div>
+    </div>
     <div class="small">Walk inside the play zone, discover hidden places, solve clues, and collect 15 magical eggs.</div>
     <div class="tap-hint" id="tapHint"> </div>
     <div class="player-chip" id="playerChip">Player: Adventurer</div>
@@ -300,6 +451,14 @@
   </div>
 
   <div class="panel quest-panel" id="questPanel"></div>
+
+  <div class="unlock-tray" id="unlockTray">
+    <div style="min-width:0; flex:1;">
+      <div style="font-weight:800;" id="unlockTrayTitle">Nearby stop ready</div>
+      <div class="small" id="unlockTrayText">Stand on the glowing spot to open.</div>
+    </div>
+    <button id="unlockNearestBtn">Open</button>
+  </div>
 
   <div class="panel" id="editorPanel">
     <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
@@ -423,22 +582,217 @@
     ]), { padding: [25, 25] });
 
     const LOCATIONS = [
-      { id: 1, name: 'Bunny HQ', lat: 43.616559, lng: -79.572199, zone: 'Home Base', icon: '🐰', type: 'intro', challenge: 'The Easter eggs have scattered across the realm. Your first task: step into adventure and greet the Bunny Keeper.', clue: 'Look for the path that leads away from home and into the realm.', reward: 'Starter Egg', radius: 24, answer: '' },
-      { id: 2, name: 'Talking Mailbox', lat: 43.615013, lng: -79.572912, zone: 'Home Base', icon: '📬', type: 'riddle', challenge: 'I hold secrets but do not talk. Tap to wake me and hear the whisper of the trail.', clue: 'What receives messages but never walks?', reward: 'Cherry Egg', radius: 20, answer: 'mailbox' },
-      { id: 3, name: 'Candy Compass', lat: 43.615685, lng: -79.572572, zone: 'Pathway', icon: '🧭', type: 'direction', challenge: 'The compass twirls in sugar sparkles and points toward the big open field.', clue: 'Head toward the grassy world where the bunny kingdom begins.', reward: 'Mint Egg', radius: 20, answer: '' },
-      { id: 4, name: 'Whispering Tree', lat: 43.614869, lng: -79.572285, zone: 'Enchanted Forest', icon: '🌳', type: 'listen', challenge: 'The old tree tells you: “Find the nest where treasure rests.”', clue: 'Nearby lies a place where little treasures sleep.', reward: 'Forest Egg', radius: 18, answer: '' },
-      { id: 5, name: 'Hidden Nest', lat: 43.616617, lng: -79.572792, zone: 'Enchanted Forest', icon: '🪺', type: 'quiz', challenge: 'Which animal is famous for hiding Easter eggs? A) Fox B) Bunny C) Turtle', clue: 'Follow the footprints to the next secret.', reward: 'Nest Egg', radius: 18, answer: 'bunny' },
-      { id: 6, name: 'Golden Carrot Patch', lat: 43.616743, lng: -79.57313, zone: 'Golden Field', icon: '🥕', type: 'collect', challenge: 'Collect 3 magic carrots by tapping the carrot button three times.', clue: 'Footprints bounce toward play and laughter.', reward: 'Carrot Egg', radius: 22, answer: '' },
-      { id: 7, name: 'Bunny Footprint Trail', lat: 43.616897, lng: -79.57276, zone: 'Golden Field', icon: '🐾', type: 'trail', challenge: 'The tracks point to a place of slides, swings, and climbing fun.', clue: 'The playground kingdom awaits.', reward: 'Trail Egg', radius: 18, answer: '' },
-      { id: 8, name: 'Slide of Secrets', lat: 43.616425, lng: -79.572357, zone: 'Playground Kingdom', icon: '🛝', type: 'action', challenge: 'Bonus challenge: go on the slide in real life, then tap “Done”.', clue: 'The swings nearby are moving with magic.', reward: 'Slide Egg', radius: 18, answer: '' },
-      { id: 9, name: 'Swing Challenge', lat: 43.616322, lng: -79.571893, zone: 'Playground Kingdom', icon: '🎠', type: 'timer', challenge: 'Stay in this zone for 10 seconds to calm the fluttering egg spirits.', clue: 'A coded message hangs nearby.', reward: 'Sky Egg', radius: 18, answer: '' },
-      { id: 10, name: 'Monkey Bar Code', lat: 43.616247, lng: -79.585669, zone: 'Playground Kingdom', icon: '🧩', type: 'scramble', challenge: 'Unscramble this word: YBUNN', clue: 'A guardian protects the next egg.', reward: 'Puzzle Egg', radius: 18, answer: 'bunny' },
-      { id: 11, name: 'Egg Guardian', lat: 43.616574, lng: -79.573164, zone: 'Playground Kingdom', icon: '🛡️', type: 'quiz', challenge: 'What color do you get by mixing red and yellow?', clue: 'Return toward the long field where colors fall from the sky.', reward: 'Guardian Egg', radius: 18, answer: 'orange' },
-      { id: 12, name: 'Rainbow Drop Zone', lat: 43.616186, lng: -79.572129, zone: 'Golden Field', icon: '🌈', type: 'tap', challenge: 'Tap the falling egg before it escapes. Ready? Tap “Catch Egg”.', clue: 'One egg is fast. Catch it if you can.', reward: 'Rainbow Egg', radius: 18, answer: '' },
-      { id: 13, name: 'Speed Egg', lat: 43.615223, lng: -79.573084, zone: 'Golden Field', icon: '⚡', type: 'speed', challenge: 'Reach this point and claim the egg before the timer ends. Tap “Start 8s Timer”.', clue: 'A giant invisible egg hides nearby in the grass.', reward: 'Lightning Egg', radius: 18, answer: '' },
-      { id: 14, name: 'Giant Invisible Egg', lat: 43.616722, lng: -79.572569, zone: 'Golden Field', icon: '👻', type: 'search', challenge: 'The giant egg cannot be seen, only sensed. Walk around and stand still to reveal it.', clue: 'All clues lead back to the final treasure.', reward: 'Ghost Egg', radius: 28, answer: '' },
-      { id: 15, name: 'Golden Egg Temple', lat: 43.615423, lng: -79.572835, zone: 'Final Shrine', icon: '🥇', type: 'final', challenge: 'Final riddle: Who hid the eggs all over the realm?', clue: 'You have completed the hunt!', reward: 'Golden Egg', radius: 20, answer: 'bunny' }
-    ];
+      {
+            "id": 1,
+            "name": "Bunny HQ",
+            "lat": 43.616701,
+            "lng": -79.571657,
+            "zone": "Home Base",
+            "icon": "🐰",
+            "type": "intro",
+            "challenge": "The Easter eggs have scattered across the realm. Your first task: step into adventure and greet the Bunny Keeper.",
+            "clue": "Look for the path that leads away from home and into the realm.",
+            "reward": "Starter Egg",
+            "radius": 24,
+            "answer": ""
+      },
+      {
+            "id": 2,
+            "name": "Talking Mailbox",
+            "lat": 43.614793,
+            "lng": -79.573406,
+            "zone": "Home Base",
+            "icon": "📬",
+            "type": "riddle",
+            "challenge": "I hold secrets but do not talk. Tap to wake me and hear the whisper of the trail.",
+            "clue": "What receives messages but never walks?",
+            "reward": "Cherry Egg",
+            "radius": 20,
+            "answer": "mailbox"
+      },
+      {
+            "id": 3,
+            "name": "Candy Compass",
+            "lat": 43.615945,
+            "lng": -79.572065,
+            "zone": "Pathway",
+            "icon": "🧭",
+            "type": "direction",
+            "challenge": "The compass twirls in sugar sparkles and points toward the big open field.",
+            "clue": "Head toward the grassy world where the bunny kingdom begins.",
+            "reward": "Mint Egg",
+            "radius": 20,
+            "answer": ""
+      },
+      {
+            "id": 4,
+            "name": "Whispering Tree",
+            "lat": 43.614403,
+            "lng": -79.572625,
+            "zone": "Enchanted Forest",
+            "icon": "🌳",
+            "type": "listen",
+            "challenge": "The old tree tells you: “Find the nest where treasure rests.”",
+            "clue": "Nearby lies a place where little treasures sleep.",
+            "reward": "Forest Egg",
+            "radius": 18,
+            "answer": ""
+      },
+      {
+            "id": 5,
+            "name": "Hidden Nest",
+            "lat": 43.617,
+            "lng": -79.572861,
+            "zone": "Enchanted Forest",
+            "icon": "🪺",
+            "type": "quiz",
+            "challenge": "Which animal is famous for hiding Easter eggs? A) Fox B) Bunny C) Turtle",
+            "clue": "Follow the footprints to the next secret.",
+            "reward": "Nest Egg",
+            "radius": 18,
+            "answer": "bunny"
+      },
+      {
+            "id": 6,
+            "name": "Golden Carrot Patch",
+            "lat": 43.617068,
+            "lng": -79.573084,
+            "zone": "Golden Field",
+            "icon": "🥕",
+            "type": "collect",
+            "challenge": "Collect 3 magic carrots by tapping the carrot button three times.",
+            "clue": "Footprints bounce toward play and laughter.",
+            "reward": "Carrot Egg",
+            "radius": 22,
+            "answer": ""
+      },
+      {
+            "id": 7,
+            "name": "Bunny Footprint Trail",
+            "lat": 43.616736,
+            "lng": -79.572271,
+            "zone": "Golden Field",
+            "icon": "🐾",
+            "type": "trail",
+            "challenge": "The tracks point to a place of slides, swings, and climbing fun.",
+            "clue": "The playground kingdom awaits.",
+            "reward": "Trail Egg",
+            "radius": 18,
+            "answer": ""
+      },
+      {
+            "id": 8,
+            "name": "Slide of Secrets",
+            "lat": 43.616627,
+            "lng": -79.571936,
+            "zone": "Playground Kingdom",
+            "icon": "🛝",
+            "type": "action",
+            "challenge": "Bonus challenge: go on the slide in real life, then tap “Done”.",
+            "clue": "The swings nearby are moving with magic.",
+            "reward": "Slide Egg",
+            "radius": 18,
+            "answer": ""
+      },
+      {
+            "id": 9,
+            "name": "Swing Challenge",
+            "lat": 43.616889,
+            "lng": -79.571976,
+            "zone": "Playground Kingdom",
+            "icon": "🎠",
+            "type": "timer",
+            "challenge": "Stay in this zone for 10 seconds to calm the fluttering egg spirits.",
+            "clue": "A coded message hangs nearby.",
+            "reward": "Sky Egg",
+            "radius": 18,
+            "answer": ""
+      },
+      {
+            "id": 10,
+            "name": "Monkey Bar Code",
+            "lat": 43.616247,
+            "lng": -79.585669,
+            "zone": "Playground Kingdom",
+            "icon": "🧩",
+            "type": "scramble",
+            "challenge": "Unscramble this word: YBUNN",
+            "clue": "A guardian protects the next egg.",
+            "reward": "Puzzle Egg",
+            "radius": 18,
+            "answer": "bunny"
+      },
+      {
+            "id": 11,
+            "name": "Egg Guardian",
+            "lat": 43.61725,
+            "lng": -79.572593,
+            "zone": "Playground Kingdom",
+            "icon": "🛡️",
+            "type": "quiz",
+            "challenge": "What color do you get by mixing red and yellow?",
+            "clue": "Return toward the long field where colors fall from the sky.",
+            "reward": "Guardian Egg",
+            "radius": 18,
+            "answer": "orange"
+      },
+      {
+            "id": 12,
+            "name": "Rainbow Drop Zone",
+            "lat": 43.614516,
+            "lng": -79.572829,
+            "zone": "Golden Field",
+            "icon": "🌈",
+            "type": "tap",
+            "challenge": "Tap the falling egg before it escapes. Ready? Tap “Catch Egg”.",
+            "clue": "One egg is fast. Catch it if you can.",
+            "reward": "Rainbow Egg",
+            "radius": 18,
+            "answer": ""
+      },
+      {
+            "id": 13,
+            "name": "Speed Egg",
+            "lat": 43.615661,
+            "lng": -79.572387,
+            "zone": "Golden Field",
+            "icon": "⚡",
+            "type": "speed",
+            "challenge": "Reach this point and claim the egg before the timer ends. Tap “Start 8s Timer”.",
+            "clue": "A giant invisible egg hides nearby in the grass.",
+            "reward": "Lightning Egg",
+            "radius": 18,
+            "answer": ""
+      },
+      {
+            "id": 14,
+            "name": "Giant Invisible Egg",
+            "lat": 43.61714,
+            "lng": -79.572625,
+            "zone": "Golden Field",
+            "icon": "👻",
+            "type": "search",
+            "challenge": "The giant egg cannot be seen, only sensed. Walk around and stand still to reveal it.",
+            "clue": "All clues lead back to the final treasure.",
+            "reward": "Ghost Egg",
+            "radius": 28,
+            "answer": ""
+      },
+      {
+            "id": 15,
+            "name": "Golden Egg Temple",
+            "lat": 43.615272,
+            "lng": -79.572884,
+            "zone": "Final Shrine",
+            "icon": "🥇",
+            "type": "final",
+            "challenge": "Final riddle: Who hid the eggs all over the realm?",
+            "clue": "You have completed the hunt!",
+            "reward": "Golden Egg",
+            "radius": 20,
+            "answer": "bunny"
+      }
+];
 
     const STORAGE_KEY = 'easter_realm_game_v2';
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
@@ -450,15 +804,24 @@
       inZone: true,
       userMarker: null,
       accuracyCircle: null,
-      showAllStops: true,
+      showAllStops: saved.showAllStops !== undefined ? saved.showAllStops : true,
       timerRunning: false,
       editMode: false,
       selectedStopId: null,
       adminVisible: false,
-      questCollapsed: false,
+      questCollapsed: saved.questCollapsed !== undefined ? saved.questCollapsed : (window.innerWidth <= 800),
       tapUnlockCount: 0,
       tapUnlockTimer: null,
-      startedAt: saved.startedAt || null
+      startedAt: saved.startedAt || null,
+      musicEnabled: saved.musicEnabled !== undefined ? saved.musicEnabled : true,
+      compactTopbar: saved.compactTopbar !== undefined ? saved.compactTopbar : (window.innerWidth <= 800),
+      nearestUnlockId: null,
+      audioReady: false,
+      audioCtx: null,
+      bgMusicTimer: null,
+      proximityTimer: null,
+      proximityTickMs: null,
+      melodyStep: 0
     };
 
     document.getElementById('playerChip').textContent = `Player: ${state.playerName}`;
@@ -468,7 +831,11 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
         playerName: state.playerName,
         found: [...state.found],
-        startedAt: state.startedAt
+        startedAt: state.startedAt,
+        showAllStops: state.showAllStops,
+        questCollapsed: state.questCollapsed,
+        musicEnabled: state.musicEnabled,
+        compactTopbar: state.compactTopbar
       }));
     }
 
@@ -479,6 +846,15 @@
         iconSize: [30, 30],
         iconAnchor: [15, 15],
         popupAnchor: [0, -12]
+      });
+    }
+
+    function getPlayerIcon() {
+      return L.divIcon({
+        className: '',
+        html: `<div class="player-marker"><div class="pulse"></div><div class="core"></div></div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
       });
     }
 
@@ -520,6 +896,182 @@
       })[0];
     }
 
+
+    function applyUiState() {
+      document.getElementById('topbar').classList.toggle('compact', !!state.compactTopbar);
+      document.getElementById('questPanel').classList.toggle('collapsed', !!state.questCollapsed);
+      document.getElementById('musicToggleBtn').textContent = state.musicEnabled ? '🎵' : '🔇';
+      document.getElementById('toggleQuestBtn').textContent = state.questCollapsed ? '📜 Show Quests' : '📜 Hide Quests';
+      persist();
+    }
+
+    function ensureAudio() {
+      if (state.audioCtx) {
+        if (state.audioCtx.state === 'suspended') state.audioCtx.resume();
+        state.audioReady = true;
+        return state.audioCtx;
+      }
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return null;
+      state.audioCtx = new AudioCtx();
+      state.audioReady = true;
+      return state.audioCtx;
+    }
+
+    function playTone(freq = 660, duration = 0.12, volume = 0.03, type = 'sine', delay = 0) {
+      if (!state.musicEnabled) return;
+      const ctx = ensureAudio();
+      if (!ctx) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const now = ctx.currentTime + delay;
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(volume, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + duration + 0.02);
+    }
+
+    function playSuccessSound() {
+      if (!state.musicEnabled) return;
+      playTone(523.25, 0.12, 0.035, 'triangle', 0);
+      playTone(659.25, 0.14, 0.035, 'triangle', 0.08);
+      playTone(783.99, 0.18, 0.04, 'triangle', 0.16);
+    }
+
+    function playUnlockSound() {
+      if (!state.musicEnabled) return;
+      playTone(740, 0.08, 0.03, 'square', 0);
+      playTone(988, 0.1, 0.03, 'square', 0.06);
+    }
+
+    function scheduleBackgroundMusic() {
+      if (!state.musicEnabled) return;
+      const melody = [523.25, 659.25, 783.99, 659.25, 587.33, 698.46, 880, 698.46];
+      const bass = [261.63, 329.63, 392, 329.63];
+      playTone(melody[state.melodyStep % melody.length], 0.18, 0.012, 'triangle', 0);
+      if (state.melodyStep % 2 === 0) {
+        playTone(bass[(state.melodyStep / 2) % bass.length | 0], 0.22, 0.007, 'sine', 0.01);
+      }
+      state.melodyStep += 1;
+    }
+
+    function startBackgroundMusic() {
+      if (!state.musicEnabled) return;
+      ensureAudio();
+      if (state.bgMusicTimer) return;
+      scheduleBackgroundMusic();
+      state.bgMusicTimer = setInterval(scheduleBackgroundMusic, 420);
+    }
+
+    function stopBackgroundMusic() {
+      if (state.bgMusicTimer) {
+        clearInterval(state.bgMusicTimer);
+        state.bgMusicTimer = null;
+      }
+    }
+
+    function setMusicEnabled(on) {
+      state.musicEnabled = !!on;
+      if (state.musicEnabled) startBackgroundMusic();
+      else stopBackgroundMusic();
+      applyUiState();
+    }
+
+    function getNearestUnfoundLocation() {
+      const next = nextUnfoundLocation();
+      if (!next || !state.userLatLng) return { loc: next, distance: null };
+      return {
+        loc: next,
+        distance: distanceMeters(state.userLatLng.lat, state.userLatLng.lng, next.lat, next.lng)
+      };
+    }
+
+    function stopProximityBeep() {
+      if (state.proximityTimer) {
+        clearTimeout(state.proximityTimer);
+        state.proximityTimer = null;
+      }
+      state.proximityTickMs = null;
+    }
+
+    function queueProximityBeep(intervalMs) {
+      if (!state.musicEnabled || state.showAllStops || !Number.isFinite(intervalMs)) return;
+      if (state.proximityTickMs === intervalMs && state.proximityTimer) return;
+      stopProximityBeep();
+      state.proximityTickMs = intervalMs;
+      const beepLoop = () => {
+        if (!state.musicEnabled || state.showAllStops || !state.nearestUnlockId) {
+          stopProximityBeep();
+          return;
+        }
+        playTone(880, 0.06, 0.02, 'square', 0);
+        state.proximityTimer = setTimeout(beepLoop, state.proximityTickMs);
+      };
+      state.proximityTimer = setTimeout(beepLoop, intervalMs);
+    }
+
+    function updateUnlockTray(loc, distance) {
+      const tray = document.getElementById('unlockTray');
+      if (!loc || !state.userLatLng || !state.inZone || distance > loc.radius) {
+        tray.style.display = 'none';
+        state.nearestUnlockId = null;
+        return;
+      }
+      state.nearestUnlockId = loc.id;
+      document.getElementById('unlockTrayTitle').textContent = `${loc.icon} ${loc.name} is ready`;
+      document.getElementById('unlockTrayText').textContent = `You are ${Math.max(0, Math.round(distance))}m away. Tap Open to unlock this stop.`;
+      tray.style.display = 'flex';
+    }
+
+    function updateProximityFeedback() {
+      const proximityNote = document.getElementById('tapHint');
+      const root = document.documentElement;
+      const { loc, distance } = getNearestUnfoundLocation();
+
+      if (!loc || !state.userLatLng || !state.inZone) {
+        root.style.setProperty('--player-pulse-duration', '1.6s');
+        root.style.setProperty('--player-pulse-scale', '1.35');
+        updateUnlockTray(null, null);
+        stopProximityBeep();
+        if (!state.adminVisible) proximityNote.textContent = '';
+        return;
+      }
+
+      const safeDistance = Math.max(0, distance);
+      const detectionEdge = Math.max(loc.radius * 3, 65);
+      const ratio = Math.max(0, Math.min(1, 1 - (safeDistance / detectionEdge)));
+      const pulseDuration = (1.65 - (ratio * 1.35)).toFixed(2) + 's';
+      const pulseScale = (1.25 + (ratio * 0.65)).toFixed(2);
+      root.style.setProperty('--player-pulse-duration', pulseDuration);
+      root.style.setProperty('--player-pulse-scale', pulseScale);
+
+      if (!state.showAllStops) {
+        if (safeDistance <= loc.radius) {
+          if (!state.adminVisible) proximityNote.textContent = `✨ ${loc.name} is under your feet. Tap Open.`;
+          updateUnlockTray(loc, safeDistance);
+          queueProximityBeep(260);
+        } else if (safeDistance <= detectionEdge) {
+          if (!state.adminVisible) proximityNote.textContent = `Getting warmer: ${Math.round(safeDistance)}m to the next hidden stop.`;
+          updateUnlockTray(null, null);
+          const interval = Math.round(1100 - (ratio * 850));
+          queueProximityBeep(interval);
+        } else {
+          if (!state.adminVisible) proximityNote.textContent = `Next hidden stop: ${Math.round(safeDistance)}m away.`;
+          updateUnlockTray(null, null);
+          stopProximityBeep();
+        }
+      } else {
+        if (!state.adminVisible) proximityNote.textContent = `${loc.name}: ${Math.round(safeDistance)}m away.`;
+        updateUnlockTray(loc, safeDistance);
+        stopProximityBeep();
+      }
+    }
+
     function updateStats() {
       document.getElementById('foundCount').textContent = state.found.size;
       document.getElementById('totalCount').textContent = LOCATIONS.length;
@@ -542,8 +1094,9 @@
           <p>${loc.challenge}</p>
           <p><em>Reward:</em> ${loc.reward}</p>
           <div class="popup-actions">
-            <button class="location-btn" onclick="window.handleLocationAction(${loc.id})">${state.found.has(loc.id) ? '✅ Already Found' : 'Unlock Challenge'}</button>
+            <button class="location-btn" onclick="window.handleLocationAction(${loc.id})">${state.found.has(loc.id) ? '✅ Already Found' : 'Open Challenge'}</button>
           </div>
+          ${state.userLatLng ? `<div class="proximity-note">${Math.round(distanceMeters(state.userLatLng.lat, state.userLatLng.lng, loc.lat, loc.lng))}m away</div>` : ''}
         </div>
       `;
     }
@@ -575,6 +1128,8 @@
       });
       markers = LOCATIONS.map(loc => createMarkerForLocation(loc));
       setStopsVisibility(state.showAllStops);
+      const compactBtn = document.getElementById('compactQuestBtn');
+      if (compactBtn) compactBtn.addEventListener('click', toggleQuestPanel);
       refreshPopups();
     }
 
@@ -684,7 +1239,9 @@
         if (!show && isOnMap) map.removeLayer(m.marker);
       });
       document.getElementById('showAllBtn').textContent = state.showAllStops ? '🙈 Hide Stops' : '🗺️ Show Stops';
+      persist();
       refreshPopups();
+      updateProximityFeedback();
     }
 
     function setEditMode(on) {
@@ -708,23 +1265,26 @@
 
     function toggleQuestPanel() {
       state.questCollapsed = !state.questCollapsed;
-      document.getElementById('toggleQuestBtn').textContent = state.questCollapsed ? '📜 Show Quests' : '📜 Hide Quests';
-      const panel = document.getElementById('questPanel');
-      panel.classList.toggle('collapsed', state.questCollapsed);
+      applyUiState();
       renderQuestPanel();
     }
 
     function renderQuestPanel() {
       const panel = document.getElementById('questPanel');
       panel.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;">
+        <div class="quest-header-row" style="margin-bottom:10px;">
           <strong>Quest Log</strong>
-          <span class="tag">${state.found.size}/${LOCATIONS.length} found</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="tag">${state.found.size}/${LOCATIONS.length} found</span>
+            <button class="icon-btn" id="compactQuestBtn" title="Collapse quest log" style="width:32px;height:32px;min-width:32px;font-size:15px;">${state.questCollapsed ? '➕' : '➖'}</button>
+          </div>
         </div>
       `;
 
       if (state.questCollapsed) {
-        panel.innerHTML += `<div class="small">Quest log collapsed.</div>`;
+        panel.innerHTML += `<div class="small">Tap the + button to reopen your quest list.</div>`;
+        const compactBtn = document.getElementById('compactQuestBtn');
+        if (compactBtn) compactBtn.addEventListener('click', toggleQuestPanel);
         refreshPopups();
         return;
       }
@@ -746,15 +1306,19 @@
         `;
         panel.appendChild(div);
       });
+      const compactBtn = document.getElementById('compactQuestBtn');
+      if (compactBtn) compactBtn.addEventListener('click', toggleQuestPanel);
       refreshPopups();
     }
 
     function markFound(id) {
       if (state.found.has(id)) return;
       state.found.add(id);
+      playSuccessSound();
       persist();
       renderQuestPanel();
       updateStats();
+      updateProximityFeedback();
       if (state.found.size === LOCATIONS.length) {
         setTimeout(() => {
           alert(`🎉 Amazing, ${state.playerName}! You found all ${LOCATIONS.length} Easter eggs in the Lost Easter Realm!`);
@@ -789,6 +1353,7 @@
         alert(`You already collected the ${loc.reward}.`);
         return;
       }
+      playUnlockSound();
       runInteraction(loc);
     };
 
@@ -901,13 +1466,7 @@
     function updateUserPosition(lat, lng, accuracy) {
       state.userLatLng = { lat, lng };
       if (!state.userMarker) {
-        state.userMarker = L.circleMarker([lat, lng], {
-          radius: 9,
-          color: '#246bff',
-          fillColor: '#7fd7ff',
-          fillOpacity: 0.95,
-          weight: 3
-        }).addTo(map).bindPopup('You are here');
+        state.userMarker = L.marker([lat, lng], { icon: getPlayerIcon(), zIndexOffset: 1000 }).addTo(map).bindPopup('You are here');
       } else {
         state.userMarker.setLatLng([lat, lng]);
       }
@@ -929,6 +1488,7 @@
       document.getElementById('warningBanner').style.display = state.inZone ? 'none' : 'block';
       updateStats();
       renderQuestPanel();
+      updateProximityFeedback();
       bringGameLayersToFront();
     }
 
@@ -965,7 +1525,10 @@
       if (!state.startedAt) state.startedAt = new Date().toISOString();
       document.getElementById('playerChip').textContent = `Player: ${state.playerName}`;
       document.getElementById('introModal').style.display = 'none';
+      ensureAudio();
+      if (state.musicEnabled) startBackgroundMusic();
       persist();
+      applyUiState();
       updateStats();
       renderQuestPanel();
       setTimeout(() => locateUser(true), 50);
@@ -1012,8 +1575,19 @@
       }
     });
 
-    document.getElementById('locateBtn').addEventListener('click', () => locateUser(true));
+    document.getElementById('locateBtn').addEventListener('click', () => { ensureAudio(); locateUser(true); });
     document.getElementById('toggleQuestBtn').addEventListener('click', toggleQuestPanel);
+    document.getElementById('musicToggleBtn').addEventListener('click', () => {
+      ensureAudio();
+      setMusicEnabled(!state.musicEnabled);
+    });
+    document.getElementById('compactTopbarBtn').addEventListener('click', () => {
+      state.compactTopbar = !state.compactTopbar;
+      applyUiState();
+    });
+    document.getElementById('unlockNearestBtn').addEventListener('click', () => {
+      if (state.nearestUnlockId) window.handleLocationAction(state.nearestUnlockId);
+    });
 
     document.getElementById('showAllBtn').addEventListener('click', () => setStopsVisibility(!state.showAllStops));
 
@@ -1190,7 +1764,7 @@
       console.assert(Math.abs(overlayCorners.bottomLeft[0] - 43.613873) < 0.000001, 'bottom-left latitude should match provided coordinate');
       console.assert(Math.abs(overlayCorners.bottomLeft[1] - (-79.575751)) < 0.000001, 'bottom-left longitude should match provided coordinate');
       console.assert(LOCATIONS.length === 15, 'hard-coded stops should load 15 entries');
-      console.assert(LOCATIONS[0].lat === 43.616559, 'hard-coded Bunny HQ should match uploaded json');
+      console.assert(LOCATIONS[0].lat === 43.616701, 'hard-coded Bunny HQ should match uploaded json');
       setStopsVisibility(false);
       console.assert(markers.every(m => !map.hasLayer(m.marker)), 'all markers should hide when stop visibility is false');
       setStopsVisibility(true);
@@ -1213,11 +1787,15 @@
     }
 
     rebuildMarkers();
+    applyUiState();
     renderQuestPanel();
     updateStats();
     baseTiles.setOpacity(overlayEnabled ? 0.35 : 1);
     setAdminVisible(false);
     bringGameLayersToFront();
+    if (saved.playerName && state.musicEnabled) {
+      setTimeout(() => { ensureAudio(); startBackgroundMusic(); }, 400);
+    }
     runSelfTests();
   </script>
 </body>
