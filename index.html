@@ -490,6 +490,24 @@
       opacity: 0.75;
     }
 
+
+
+    .radius-label-icon {
+      background: transparent;
+      border: 0;
+    }
+
+    .radius-label {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.92);
+      color: #2e2e3a;
+      font-size: 11px;
+      font-weight: 800;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+      white-space: nowrap;
+    }
     @media (max-width: 800px) {
       .topbar {
         top: 10px;
@@ -571,6 +589,7 @@
     <div class="controls" id="publicControls">
       <button id="locateBtn">📍 Find Me</button>
       <button class="secondary" id="toggleQuestBtn">📜 Hide Quests</button>
+      <button class="secondary" id="toggleRadiusBtn">⭕ Radius On</button>
     </div>
 
     <div class="controls" id="adminControls">
@@ -629,7 +648,7 @@
       <h2>Welcome to the Lost Easter Realm</h2>
       <p>Type your player name, then walk to each magical spot in the play area. When you are close enough, the challenge unlocks.</p>
       <input id="playerNameInput" type="text" placeholder="Enter player name" maxlength="24" autofocus />
-      <button id="startGameBtn" type="button" onclick="window.__forceStartGame && window.__forceStartGame(event)">Start the Hunt</button>
+      <button id="startGameBtn" onclick="safeStartGame(event)">Start the Hunt</button>
     </div>
   </div>
 
@@ -962,10 +981,13 @@
       lastZone: null,
       radarPulse: null,
       radarCircle: null,
-      winShown: false
+      winShown: false,
+      radiusVisible: saved.radiusVisible !== false
     };
 
     document.getElementById('playerChip').textContent = `Player: ${state.playerName}`;
+    buildRadiusVisuals();
+
     if (saved.playerName) document.getElementById('introModal').style.display = 'none';
 
     function persist() {
@@ -976,8 +998,57 @@
         showAllStops: state.showAllStops,
         questCollapsed: state.questCollapsed,
         musicEnabled: state.musicEnabled,
-        compactTopbar: state.compactTopbar
+        compactTopbar: state.compactTopbar,
+        radiusVisible: state.radiusVisible
       }));
+    }
+
+    const radiusLayer = L.layerGroup().addTo(map);
+    const radiusVisuals = [];
+
+    function buildRadiusVisuals() {
+      radiusLayer.clearLayers();
+      radiusVisuals.length = 0;
+      LOCATIONS.forEach(loc => {
+        const circle = L.circle([loc.lat, loc.lng], {
+          radius: Number(loc.radius) || 20,
+          color: '#4aa8ff',
+          weight: 1.5,
+          opacity: 0.55,
+          fillColor: '#7fd7ff',
+          fillOpacity: 0.10,
+          interactive: false
+        });
+        const label = L.marker([loc.lat, loc.lng], {
+          interactive: false,
+          icon: L.divIcon({
+            className: 'radius-label-icon',
+            html: `<div class="radius-label">${Number(loc.radius) || 20}m</div>`,
+            iconSize: [44, 18],
+            iconAnchor: [22, -8]
+          })
+        });
+        radiusLayer.addLayer(circle);
+        radiusLayer.addLayer(label);
+        radiusVisuals.push({ circle, label, id: loc.id });
+      });
+      updateRadiusVisibility();
+    }
+
+    function updateRadiusVisibility() {
+      const show = !!state.radiusVisible;
+      radiusVisuals.forEach(v => {
+        const circleEl = v.circle.getElement && v.circle.getElement();
+        const labelEl = v.label.getElement && v.label.getElement();
+        if (circleEl) circleEl.style.display = show ? '' : 'none';
+        if (labelEl) labelEl.style.display = show ? '' : 'none';
+      });
+    }
+
+    function toggleRadiusVisibility() {
+      state.radiusVisible = !state.radiusVisible;
+      persist();
+      applyUiState();
     }
 
     function getEggIcon(emoji) {
@@ -1800,32 +1871,50 @@
 
     function startGame() {
       const inputEl = document.getElementById('playerNameInput');
-      const input = inputEl ? inputEl.value.trim() : '';
+      const input = inputEl ? String(inputEl.value || '').trim() : '';
       state.playerName = input || 'Adventurer';
       if (!state.startedAt) state.startedAt = new Date().toISOString();
+
       const playerChip = document.getElementById('playerChip');
       if (playerChip) playerChip.textContent = `Player: ${state.playerName}`;
+
       const introModal = document.getElementById('introModal');
-      if (introModal) introModal.style.display = 'none';
-      ensureAudio();
-      if (state.musicEnabled) startBackgroundMusic();
-      persist();
-      applyUiState();
-      updateStats();
-      renderQuestPanel();
-      setTimeout(() => locateUser(true), 50);
+      if (introModal) {
+        introModal.style.display = 'none';
+        introModal.setAttribute('aria-hidden', 'true');
+      }
+
+      try { ensureAudio(); } catch (err) { console.warn('Audio init skipped', err); }
+      try { if (state.musicEnabled && typeof startBackgroundMusic === 'function') startBackgroundMusic(); } catch (err) { console.warn('Music start skipped', err); }
+      try { persist(); } catch (err) { console.warn('Persist skipped', err); }
+      try { applyUiState(); } catch (err) { console.warn('UI state skipped', err); }
+      try { updateStats(); } catch (err) { console.warn('Stats skipped', err); }
+      try { renderQuestPanel(); } catch (err) { console.warn('Quest panel skipped', err); }
+      try { if (typeof buildRadiusVisuals === 'function') buildRadiusVisuals(); } catch (err) { console.warn('Radius visuals skipped', err); }
+      try { setTimeout(() => locateUser(true), 50); } catch (err) { console.warn('Locate skipped', err); }
+
+      document.body.classList.add('game-started');
+      return true;
     }
 
-    window.__forceStartGame = function(event) {
+    function safeStartGame(event) {
       if (event && typeof event.preventDefault === 'function') event.preventDefault();
+      if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
       try {
-        startGame();
+        return startGame();
       } catch (err) {
         console.error('Start button failed:', err);
-        alert('The game could not start. Check the browser console for details.');
+        const introModal = document.getElementById('introModal');
+        if (introModal) introModal.style.display = 'none';
+        const playerChip = document.getElementById('playerChip');
+        const inputEl = document.getElementById('playerNameInput');
+        const fallbackName = inputEl && inputEl.value ? inputEl.value.trim() : 'Adventurer';
+        if (playerChip) playerChip.textContent = `Player: ${fallbackName || 'Adventurer'}`;
+        return false;
       }
-      return false;
-    };
+    }
+
+    window.__forceStartGame = safeStartGame;
 
     function exportResults() {
       const exportData = {
@@ -1860,18 +1949,19 @@
     if (startGameBtn) {
       startGameBtn.addEventListener('click', e => {
         e.preventDefault();
-        window.__forceStartGame(e);
+        safeStartGame(e);
       });
     }
 
     document.getElementById('playerNameInput').addEventListener('keydown', e => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        startGame();
+        safeStartGame(e);
       }
     });
 
     document.getElementById('locateBtn').addEventListener('click', () => { ensureAudio(); locateUser(true); });
+    document.getElementById('toggleRadiusBtn').addEventListener('click', toggleRadiusVisibility);
     document.getElementById('toggleQuestBtn').addEventListener('click', toggleQuestPanel);
     document.getElementById('musicToggleBtn').addEventListener('click', () => {
       ensureAudio();
@@ -2099,17 +2189,37 @@
       setTimeout(() => { ensureAudio(); startBackgroundMusic(); }, 400);
     }
     runSelfTests();
-    function setOverlayStatus(message) {
-      const el = document.getElementById('overlayStatus');
-      if (!el) return;
-      el.style.display = 'block';
-      el.textContent = message;
-      clearTimeout(setOverlayStatus._timer);
-      setOverlayStatus._timer = setTimeout(() => {
-        el.style.display = 'none';
-      }, 2500);
-    }
 
-      </script>
+
+function setOverlayStatus(message) {
+  const el = document.getElementById('overlayStatus');
+  if (!el) return;
+  el.style.display = 'block';
+  el.textContent = message;
+  clearTimeout(setOverlayStatus._timer);
+  setOverlayStatus._timer = setTimeout(() => {
+    el.style.display = 'none';
+  }, 2500);
+}
+
+// Extra hidden admin shortcuts:
+// Desktop: press A to open admin
+// Mobile: long-press top-left corner for 1.2s
+let pressTimer;
+document.addEventListener('keydown', (e) => {
+  if (e.key && e.key.toLowerCase() === 'a') {
+    setAdminVisible(true);
+  }
+});
+
+document.addEventListener('touchstart', (e) => {
+  if (e.touches && e.touches[0] && e.touches[0].clientX < 80 && e.touches[0].clientY < 80) {
+    pressTimer = setTimeout(() => setAdminVisible(true), 1200);
+  }
+}, { passive: true });
+
+document.addEventListener('touchend', () => clearTimeout(pressTimer), { passive: true });
+document.addEventListener('touchcancel', () => clearTimeout(pressTimer), { passive: true });
+  </script>
 </body>
 </html>
