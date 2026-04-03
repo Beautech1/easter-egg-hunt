@@ -302,7 +302,9 @@
     .topbar.compact .tap-hint,
     .topbar.compact .player-chip,
     .topbar.compact .stats,
-    .topbar.compact .controls {
+    .topbar.compact .controls,
+    .topbar.compact .heat-wrap,
+    .topbar.compact .overlay-edit-tip {
       display: none;
     }
 
@@ -491,48 +493,128 @@
     }
 
     @media (max-width: 800px) {
+      .panel {
+        border-radius: 16px;
+      }
+
       .topbar {
-        top: 10px;
-        left: 10px;
-        width: min(240px, calc(100vw - 20px));
-        padding: 10px;
+        top: 8px;
+        left: 8px;
+        width: min(190px, calc(100vw - 16px));
+        padding: 8px;
+      }
+
+      .topbar.compact {
+        width: min(168px, calc(100vw - 16px));
+        padding: 8px 10px;
+      }
+
+      .topbar h1 { font-size: 14px; }
+      .topbar .small,
+      .topbar .player-chip,
+      .topbar .heat-wrap,
+      .topbar .tap-hint,
+      .topbar .overlay-edit-tip {
+        font-size: 11px;
       }
 
       .quest-panel {
         top: auto;
-        bottom: 10px;
-        right: 10px;
-        width: min(230px, calc(100vw - 20px));
-        max-height: 33vh;
-        padding: 10px;
+        bottom: 8px;
+        right: 8px;
+        width: min(190px, calc(100vw - 16px));
+        max-height: 24vh;
+        padding: 8px;
+      }
+
+      .quest-panel.compact,
+      #questPanel.collapsed {
+        width: min(170px, calc(100vw - 16px));
+        max-height: 74px;
       }
 
       .quest-card {
-        padding: 10px;
-        margin-bottom: 8px;
+        padding: 8px;
+        margin-bottom: 6px;
       }
 
-      .topbar h1 { font-size: 16px; }
-      .stats { grid-template-columns: repeat(2, 1fr); gap: 6px; }
-      .stat { padding: 6px; }
-      .stat strong { font-size: 14px; }
-      .controls { gap: 6px; }
-      button { padding: 8px 10px; font-size: 12px; }
-      .warning-banner { bottom: 12px; font-size: 12px; padding: 10px 12px; }
+      .stats { grid-template-columns: repeat(2, 1fr); gap: 5px; margin-top: 8px; }
+      .stat { padding: 5px; border-radius: 10px; }
+      .stat strong { font-size: 12px; }
+      .stat span { font-size: 10px; }
+
+      .controls { gap: 5px; margin-top: 8px; }
+      button { padding: 7px 9px; font-size: 11px; }
+      .icon-btn { width: 32px; height: 32px; min-width: 32px; font-size: 15px; }
+
+      .warning-banner { bottom: 10px; font-size: 11px; padding: 8px 10px; max-width: calc(100vw - 20px); }
+
       #editorPanel {
         top: auto;
-        bottom: 10px;
-        left: 10px;
-        width: min(260px, calc(100vw - 20px));
-        max-height: 42vh;
+        bottom: 8px;
+        left: 8px;
+        width: min(200px, calc(100vw - 16px));
+        max-height: 34vh;
+        padding: 10px;
       }
+
       .unlock-tray {
-        bottom: 60px;
-        width: min(300px, calc(100vw - 20px));
-        padding: 8px 10px;
+        bottom: 54px;
+        width: min(255px, calc(100vw - 16px));
+        padding: 8px 9px;
       }
-      .win-card h2 { font-size: 28px; }
-      .win-grid { grid-template-columns: 1fr; }
+
+      .modal {
+        padding: 10px;
+      }
+
+      .modal-card {
+        width: 100%;
+        max-width: 340px;
+        padding: 16px 14px;
+        border-radius: 18px;
+      }
+
+      .modal-card h2 { font-size: 22px; }
+      .modal-card p { font-size: 13px; margin: 8px 0 10px; }
+      .modal-card input { padding: 10px 12px; font-size: 15px; margin: 8px 0 10px; }
+
+      .win-card {
+        padding: 18px 14px;
+        border-radius: 18px;
+      }
+
+      .win-card h2 { font-size: 24px; }
+      .win-grid { grid-template-columns: 1fr; gap: 8px; }
+    }
+
+    @media (max-width: 520px) {
+      .topbar,
+      .topbar.compact {
+        width: min(160px, calc(100vw - 14px));
+      }
+
+      .quest-panel,
+      .quest-panel.compact,
+      #questPanel.collapsed {
+        width: min(160px, calc(100vw - 14px));
+      }
+
+      #editorPanel {
+        width: min(170px, calc(100vw - 14px));
+      }
+
+      .unlock-tray {
+        width: min(220px, calc(100vw - 14px));
+      }
+
+      .quest-title {
+        font-size: 12px;
+      }
+
+      .topbar h1 {
+        font-size: 13px;
+      }
     }
   </style>
 </head>
@@ -1140,6 +1222,7 @@
 
     document.getElementById('playerChip').textContent = `Player: ${state.playerName}`;
     if (saved.playerName) document.getElementById('introModal').style.display = 'none';
+    enforceMobileLayout();
 
     function persist() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -1211,11 +1294,24 @@
     }
 
 
+    function isMobileView() {
+      return window.innerWidth <= 800;
+    }
+
+    function enforceMobileLayout() {
+      if (!isMobileView()) return;
+      state.compactTopbar = true;
+      state.questCollapsed = true;
+      const editor = document.getElementById('editorPanel');
+      if (editor && !state.adminVisible) editor.style.display = 'none';
+    }
+
     function applyUiState() {
       document.getElementById('topbar').classList.toggle('compact', !!state.compactTopbar);
       document.getElementById('questPanel').classList.toggle('collapsed', !!state.questCollapsed);
       document.getElementById('musicToggleBtn').textContent = state.musicEnabled ? '🎵' : '🔇';
       document.getElementById('toggleQuestBtn').textContent = state.questCollapsed ? '📜 Show Quests' : '📜 Hide Quests';
+      document.getElementById('compactTopbarBtn').textContent = state.compactTopbar ? '➕' : '➖';
       persist();
     }
 
@@ -2037,6 +2133,15 @@
     document.getElementById('compactTopbarBtn').addEventListener('click', () => {
       state.compactTopbar = !state.compactTopbar;
       applyUiState();
+    });
+
+    window.addEventListener('resize', () => {
+      if (isMobileView()) {
+        state.compactTopbar = true;
+        state.questCollapsed = true;
+      }
+      applyUiState();
+      renderQuestPanel();
     });
     document.getElementById('unlockNearestBtn').addEventListener('click', () => {
       if (state.nearestUnlockId) window.handleLocationAction(state.nearestUnlockId);
