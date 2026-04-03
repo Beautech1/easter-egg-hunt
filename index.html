@@ -82,6 +82,15 @@
     }
     .captured-icon{font-size:22px;line-height:28px;text-align:center}
     .leaflet-popup-content-wrapper{border-radius:14px}
+
+    #compass{
+      position:absolute;top:78px;left:50%;transform:translateX(-50%);z-index:1400;
+      background:rgba(255,255,255,.92);color:#2f3b2f;padding:7px 12px;border-radius:999px;
+      font-weight:700;font-size:14px;box-shadow:0 6px 14px rgba(0,0,0,.18);display:flex;align-items:center;gap:8px;
+      backdrop-filter:blur(4px)
+    }
+    #compassNeedle{display:inline-block;transition:transform .22s linear;font-size:18px;line-height:1}
+    #compassText{white-space:nowrap}
     @media (max-width:600px){
       #title{font-size:18px}
       #bottomPanel{left:8px;right:8px;bottom:8px;padding:10px}
@@ -102,6 +111,11 @@
     </div>
   </div>
 
+  <div id="compass">
+    <span id="compassNeedle">🧭</span>
+    <span id="compassText">Heading: --</span>
+  </div>
+
   <div id="map"></div>
 
   <div id="bottomPanel">
@@ -110,6 +124,7 @@
       <button id="captureBtn" disabled>Capture Egg</button>
       <button class="btn" id="centerBtn">Center Me</button>
       <button class="btn" id="changePlayerBtn">Change Player</button>
+      <button class="btn" id="musicBtn">Music: ON</button>
     </div>
   </div>
 
@@ -120,7 +135,6 @@
       <button class="btn" id="toggleHideBtn">Hide Eggs: OFF</button>
       <button class="btn" id="toggleAddModeBtn">Add Mode: OFF</button>
       <button class="btn" id="reloadJsonBtn">Reload File</button>
-      <button class="btn" id="musicBtn">Music: ON</button>
       <button class="btn" id="closeAdminBtn">Close</button>
     </div>
     <div class="btnRow">
@@ -254,6 +268,21 @@ let titleTapTimer = null;
 function distanceMeters(a,b){ return map.distance(a,b); }
 function getPlayerStorageKey(){ return 'egg_hunt_captures_' + playerName.toLowerCase().replace(/\s+/g,'_'); }
 function escapeHtml(text){ return String(text).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;'); }
+
+
+function getCompassDirection(deg){
+  const directions = ['N','NE','E','SE','S','SW','W','NW'];
+  return directions[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+}
+
+function updateCompassDisplay(heading){
+  currentHeading = heading;
+  const dir = getCompassDirection(heading);
+  const textEl = document.getElementById('compassText');
+  const needleEl = document.getElementById('compassNeedle');
+  if (textEl) textEl.textContent = `Heading: ${dir} (${Math.round(heading)}°)`;
+  if (needleEl) needleEl.style.transform = `rotate(${Math.round(heading)}deg)`;
+}
 
 function askPlayerName(){
   const saved = localStorage.getItem('egg_hunt_player_name') || '';
@@ -453,7 +482,7 @@ function stopBackgroundTune(){
 
 function applyMapRotation(heading){
   if (!map || !Number.isFinite(heading)) return;
-  currentHeading = heading;
+  updateCompassDisplay(heading);
   const pane = map.getPane('mapPane');
   if (!pane) return;
   pane.style.transformOrigin = '50% 50%';
