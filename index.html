@@ -2,2432 +2,581 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Easter Hunt GPS Game</title>
-  <!-- Save your themed map image in the same folder as this HTML file and name it play-zone.png -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Easter Egg Scavenger Hunt</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <style>
-    :root {
-      --bg: #fff8fb;
-      --panel: rgba(255,255,255,0.95);
-      --pink: #ff6fb5;
-      --yellow: #ffd74f;
-      --blue: #7fd7ff;
-      --mint: #87f0c0;
-      --purple: #b992ff;
-      --text: #2e2e3a;
-      --shadow: 0 10px 30px rgba(0,0,0,0.18);
-      --radius: 18px;
-      --player-pulse-duration: 1.6s;
-      --player-pulse-scale: 1.35;
-      --player-glow: rgba(74,168,255,0.30);
+    :root{
+      --purple:#7b4dff;
+      --pink:#ff66b3;
+      --yellow:#ffd84d;
+      --green:#2fbf71;
+      --red:#ff3b30;
+      --blue:#2f7cff;
+      --panel:rgba(255,255,255,.96);
+      --shadow:0 10px 30px rgba(0,0,0,.22);
     }
-
-    * { box-sizing: border-box; }
-    html, body {
-      height: 100%;
-      margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
-      background: var(--bg);
-      color: var(--text);
+    html,body{height:100%;margin:0;font-family:Arial,sans-serif;background:#f7f2ff;overflow:hidden}
+    #app{height:100%;display:flex;flex-direction:column}
+    #topBar{
+      position:relative;z-index:1200;color:#fff;padding:10px 12px;
+      background:linear-gradient(135deg,var(--purple),var(--pink));
+      box-shadow:0 2px 10px rgba(0,0,0,.15)
     }
-
-    #map { height: 100%; width: 100%; }
-
-    .panel {
-      position: absolute;
-      z-index: 1200;
-      background: var(--panel);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      border: 2px solid rgba(255,255,255,0.8);
-      backdrop-filter: blur(10px);
+    #title{font-size:20px;font-weight:700;text-align:center;user-select:none;cursor:pointer}
+    #subTitle{font-size:12px;text-align:center;opacity:.95;margin-top:3px}
+    #infoBar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+    .pill{background:rgba(255,255,255,.16);padding:6px 10px;border-radius:999px;font-size:13px}
+    #map{flex:1;width:100%}
+    #bottomPanel{
+      position:absolute;z-index:1300;left:10px;right:10px;bottom:10px;margin:auto;
+      max-width:560px;background:var(--panel);border-radius:18px;padding:12px;box-shadow:var(--shadow)
     }
-
-    .topbar {
-      top: 14px;
-      left: 14px;
-      width: min(360px, calc(100vw - 28px));
-      padding: 14px 14px 12px;
+    #statusText{font-size:14px;line-height:1.35;color:#333;min-height:38px}
+    .btnRow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    button{
+      border:none;border-radius:12px;padding:11px 13px;font-size:14px;font-weight:700;cursor:pointer
     }
-
-    .topbar h1 {
-      margin: 0 0 6px;
-      font-size: 22px;
-      line-height: 1.1;
-      cursor: pointer;
-      user-select: none;
+    #captureBtn{flex:1 1 180px;background:linear-gradient(135deg,var(--green),#58d68d);color:#fff}
+    #captureBtn:disabled{background:#cbd5d1;color:#f8f8f8;cursor:not-allowed}
+    .btn{background:#f0e9ff;color:#5a32c8}
+    #adminPanel{
+      position:absolute;top:88px;right:10px;z-index:1500;width:min(92vw,380px);
+      max-height:72vh;overflow:auto;background:rgba(255,255,255,.98);border-radius:18px;padding:14px;box-shadow:var(--shadow);display:none
     }
-
-    .small {
-      font-size: 13px;
-      opacity: 0.9;
+    #adminPanel h3{margin:0 0 8px 0}
+    #eggJson{width:100%;min-height:220px;resize:vertical;box-sizing:border-box;border-radius:12px;border:1px solid #d7d7d7;padding:10px;font-family:Consolas,monospace;font-size:12px}
+    .small{font-size:12px;color:#666}
+    #celebration{position:absolute;inset:0;z-index:3000;display:none;align-items:center;justify-content:center;pointer-events:none;background:radial-gradient(circle at center, rgba(255,255,255,.08), rgba(123,77,255,.22), rgba(255,102,179,.28))}
+    #celebrationCard{background:linear-gradient(180deg, rgba(255,255,255,.98), rgba(255,244,204,.98));border-radius:28px;padding:28px 24px;text-align:center;min-width:280px;box-shadow:0 16px 40px rgba(0,0,0,.25);transform:scale(.85);animation:popWin .45s ease forwards}
+    #celebrationCard h2{margin:0 0 8px;color:var(--green);font-size:32px}
+    #celebrationMessage{font-size:18px;font-weight:700;color:#5a32c8}
+    @keyframes popWin{0%{transform:scale(.4) rotate(-6deg);opacity:0}70%{transform:scale(1.08) rotate(2deg);opacity:1}100%{transform:scale(1) rotate(0deg);opacity:1}}
+    .confetti-piece{position:absolute;width:10px;height:14px;border-radius:3px;animation:fall linear forwards;opacity:.95}
+    @keyframes fall{from{transform:translateY(-20px) rotate(0deg)}to{transform:translateY(110vh) rotate(720deg)}}
+    .gps-dot{
+      width:24px;height:24px;border-radius:50%;border:3px solid white;
+      box-shadow:0 0 0 3px rgba(0,0,0,.12),0 0 18px rgba(47,124,255,.35);background:var(--blue)
     }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-      margin-top: 12px;
-    }
-
-    .stat {
-      background: linear-gradient(135deg, #fff, #fff7d6);
-      border-radius: 14px;
-      padding: 10px;
-      border: 1px solid rgba(0,0,0,0.05);
-      text-align: center;
-    }
-
-    .stat strong { display: block; font-size: 20px; }
-    .stat span { font-size: 12px; }
-
-    .controls {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-top: 12px;
-    }
-
-    button {
-      border: 0;
-      border-radius: 999px;
-      padding: 10px 14px;
-      font-weight: 700;
-      cursor: pointer;
-      background: linear-gradient(135deg, var(--pink), #ff9ece);
-      color: white;
-      box-shadow: 0 8px 18px rgba(255,111,181,0.35);
-    }
-
-    button.secondary {
-      background: linear-gradient(135deg, var(--blue), #4aa8ff);
-      box-shadow: 0 8px 18px rgba(80,160,255,0.28);
-    }
-
-    button.ghost {
-      background: linear-gradient(135deg, var(--purple), #8a7dff);
-      box-shadow: 0 8px 18px rgba(130,110,255,0.26);
-    }
-
-    .quest-panel {
-      right: 14px;
-      top: 14px;
-      width: min(370px, calc(100vw - 28px));
-      max-height: calc(100vh - 28px);
-      overflow: auto;
-      padding: 14px;
-    }
-
-    .quest-card {
-      border-radius: 16px;
-      padding: 12px;
-      margin-bottom: 10px;
-      background: linear-gradient(135deg, #fff, #fdf6ff);
-      border: 1px solid rgba(0,0,0,0.06);
-    }
-
-    .quest-card.locked { opacity: 0.7; }
-    .quest-card.found {
-      background: linear-gradient(135deg, #f2fff7, #e4fff1);
-      border-color: rgba(92, 198, 126, 0.35);
-    }
-
-    .quest-title {
-      font-weight: 800;
-      margin-bottom: 6px;
-      display: flex;
-      justify-content: space-between;
-      gap: 8px;
-    }
-
-    .tag {
-      display: inline-block;
-      padding: 4px 9px;
-      border-radius: 999px;
-      font-size: 11px;
-      background: #fff1a8;
-    }
-
-    .popup-content h3 { margin: 0 0 6px; }
-    .popup-content p { margin: 6px 0; }
-    .popup-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
-
-    .warning-banner {
-      position: absolute;
-      bottom: 18px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1200;
-      padding: 14px 18px;
-      border-radius: 999px;
-      color: white;
-      background: linear-gradient(135deg, rgba(40,40,58,0.95), rgba(78,58,96,0.95));
-      box-shadow: var(--shadow);
-      display: none;
-      text-align: center;
-      max-width: calc(100vw - 30px);
-      font-weight: 700;
-    }
-
-    .player-chip {
-      margin-top: 10px;
-      padding: 9px 12px;
-      background: linear-gradient(135deg, #eefcff, #f7eeff);
-      border-radius: 999px;
-      font-size: 13px;
-      font-weight: 700;
-    }
-
-    .modal {
-      position: fixed;
-      inset: 0;
-      background: rgba(25,20,35,0.58);
-      z-index: 2000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 18px;
-    }
-
-    .modal-card {
-      width: min(560px, 100%);
-      background: white;
-      border-radius: 24px;
-      padding: 22px;
-      box-shadow: var(--shadow);
-      text-align: center;
-    }
-
-    .modal-card h2 { margin-top: 0; }
-
-    .modal-card input {
-      width: 100%;
-      border: 2px solid #eee;
-      border-radius: 14px;
-      padding: 12px 14px;
-      font-size: 16px;
-      margin: 10px 0 14px;
-    }
-
-
-
-    #confettiLayer {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      overflow: hidden;
-      z-index: 2600;
-    }
-
-    .confetti-piece {
-      position: absolute;
-      top: -12vh;
-      width: 10px;
-      height: 16px;
-      border-radius: 4px;
-      opacity: 0.95;
-      animation: confettiFall linear forwards;
-      will-change: transform, opacity;
-    }
-
-    @keyframes confettiFall {
-      0% { transform: translate3d(0,0,0) rotate(0deg) scale(1); opacity: 1; }
-      100% { transform: translate3d(var(--drift, 0px), 115vh, 0) rotate(var(--spin, 540deg)) scale(0.9); opacity: 0; }
-    }
-
-    .leaflet-popup-content-wrapper { border-radius: 18px; }
-
-    .location-btn {
-      display: inline-block;
-      width: 100%;
-      text-align: center;
-      margin-top: 8px;
-    }
-
-    #adminControls {
-      display: none;
-      border-top: 1px solid rgba(0,0,0,0.08);
-      padding-top: 10px;
-    }
-
-    #questPanel.collapsed {
-      max-height: 72px;
-      overflow: hidden;
-    }
-
-    #editorPanel {
-      left: 14px;
-      top: 290px;
-      width: min(360px, calc(100vw - 28px));
-      padding: 14px;
-      display: none;
-      z-index: 1300;
-      max-height: calc(100vh - 320px);
-      overflow: auto;
-    }
-
-    .tap-hint {
-      margin-top: 8px;
-      font-size: 11px;
-      opacity: 0.6;
-    }
-
-    .topbar-header, .quest-header-row {
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-    }
-
-    .icon-btn {
-      border: 0;
-      border-radius: 999px;
-      width: 38px;
-      height: 38px;
-      min-width: 38px;
-      padding: 0;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, #ffffff, #f3f3ff);
-      color: var(--text);
-      box-shadow: 0 5px 14px rgba(0,0,0,0.12);
-      cursor: pointer;
-      font-size: 18px;
-    }
-
-    .topbar.compact .small,
-    .topbar.compact .tap-hint,
-    .topbar.compact .player-chip,
-    .topbar.compact .stats,
-    .topbar.compact .controls,
-    .topbar.compact .heat-wrap,
-    .topbar.compact .overlay-edit-tip {
-      display: none;
-    }
-
-    .topbar.compact {
-      width: min(250px, calc(100vw - 24px));
-      padding: 10px 12px;
-    }
-
-    .topbar.compact h1 {
-      margin: 0;
-      font-size: 16px;
-    }
-
-    .quest-panel.compact {
-      width: min(210px, calc(100vw - 24px));
-      max-height: 68px;
-      overflow: hidden;
-      padding-bottom: 10px;
-    }
-
-    .unlock-tray {
-      position: absolute;
-      left: 50%;
-      bottom: 78px;
-      transform: translateX(-50%);
-      z-index: 1600;
-      display: none;
-      align-items: center;
-      gap: 10px;
-      width: min(340px, calc(100vw - 28px));
-      background: rgba(255,255,255,0.96);
-      border-radius: 18px;
-      box-shadow: var(--shadow);
-      padding: 10px 12px;
-      backdrop-filter: blur(8px);
-    }
-
-    .unlock-tray .small {
-      font-size: 12px;
-      line-height: 1.25;
-    }
-
-    .unlock-tray button {
-      flex: 0 0 auto;
-      padding: 10px 12px;
-    }
-
-    .player-marker {
-      width: 22px;
-      height: 22px;
-      position: relative;
-      transform: translate(-11px, -11px);
-    }
-
-    .player-marker .core {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, #ffffff 0 18%, #8ee9ff 19% 35%, #2e7dff 36% 100%);
-      border: 2px solid white;
-      box-shadow: 0 0 0 2px rgba(36,107,255,0.35), 0 0 20px var(--player-glow);
-      position: relative;
-      z-index: 2;
-    }
-
-    .player-marker .pulse {
-      position: absolute;
-      inset: -8px;
-      border-radius: 50%;
-      border: 3px solid rgba(74,168,255,0.65);
-      animation: playerPulse var(--player-pulse-duration) ease-out infinite;
-      transform-origin: center;
-    }
-
-    @keyframes playerPulse {
-      0% { transform: scale(0.85); opacity: 0.95; }
-      75% { transform: scale(var(--player-pulse-scale)); opacity: 0.1; }
-      100% { transform: scale(calc(var(--player-pulse-scale) + 0.1)); opacity: 0; }
-    }
-
-    .proximity-note {
-      margin-top: 8px;
-      padding: 8px 10px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #eefcff, #fff7d6);
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    .heat-wrap {
-      margin-top: 10px;
-      padding: 8px 10px;
-      border-radius: 14px;
-      background: linear-gradient(135deg, #fff, #f8fbff);
-      border: 1px solid rgba(0,0,0,0.05);
-    }
-
-    .heat-top {
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:8px;
-      font-size:12px;
-      font-weight:700;
-      margin-bottom:6px;
-    }
-
-    .heat-track {
-      height: 10px;
-      background: #edf1f6;
-      border-radius: 999px;
-      overflow: hidden;
-    }
-
-    .heat-bar {
-      height: 100%;
-      width: 0%;
-      border-radius: 999px;
-      background: linear-gradient(90deg, #4aa8ff 0%, #7fd7ff 25%, #87f0c0 45%, #ffd74f 70%, #ff6fb5 100%);
-      transition: width 0.28s ease;
-    }
-
-    .win-screen {
-      position: fixed;
-      inset: 0;
-      z-index: 3000;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 18px;
-      background: rgba(25,20,35,0.86);
-      backdrop-filter: blur(6px);
-    }
-
-    .win-card {
-      width: min(560px, 100%);
-      background: linear-gradient(180deg, #ffffff, #fff6ff);
-      border-radius: 26px;
-      padding: 26px 22px;
-      text-align: center;
-      box-shadow: var(--shadow);
-    }
-
-    .win-card h2 {
-      margin: 0 0 8px;
-      font-size: 34px;
-      line-height: 1.05;
-    }
-
-    .win-grid {
-      display:grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap:10px;
-      margin:18px 0;
-    }
-
-    .win-stat {
-      padding: 12px 10px;
-      border-radius: 16px;
-      background: linear-gradient(135deg, #fff, #f6fbff);
-      border: 1px solid rgba(0,0,0,0.05);
-    }
-
-    .win-stat strong {
-      display:block;
-      font-size: 24px;
-      margin-bottom: 4px;
-    }
-
-
-
-    .overlay-handle {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      border: 3px solid white;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.28);
-    }
-    .overlay-handle.corner { background: #ff6fb5; }
-    .overlay-handle.center { background: #4aa8ff; width: 22px; height: 22px; }
-    .leaflet-marker-icon { cursor: grab !important; }
-    .overlay-edit-tip {
-      margin-top: 8px;
-      font-size: 11px;
-      opacity: 0.75;
-    }
-
-    @media (max-width: 800px) {
-      .panel {
-        border-radius: 16px;
-      }
-
-      .topbar {
-        top: 8px;
-        left: 8px;
-        width: min(190px, calc(100vw - 16px));
-        padding: 8px;
-      }
-
-      .topbar.compact {
-        width: min(168px, calc(100vw - 16px));
-        padding: 8px 10px;
-      }
-
-      .topbar h1 { font-size: 14px; }
-      .topbar .small,
-      .topbar .player-chip,
-      .topbar .heat-wrap,
-      .topbar .tap-hint,
-      .topbar .overlay-edit-tip {
-        font-size: 11px;
-      }
-
-      .quest-panel {
-        top: auto;
-        bottom: 8px;
-        right: 8px;
-        width: min(190px, calc(100vw - 16px));
-        max-height: 24vh;
-        padding: 8px;
-      }
-
-      .quest-panel.compact,
-      #questPanel.collapsed {
-        width: min(170px, calc(100vw - 16px));
-        max-height: 74px;
-      }
-
-      .quest-card {
-        padding: 8px;
-        margin-bottom: 6px;
-      }
-
-      .stats { grid-template-columns: repeat(2, 1fr); gap: 5px; margin-top: 8px; }
-      .stat { padding: 5px; border-radius: 10px; }
-      .stat strong { font-size: 12px; }
-      .stat span { font-size: 10px; }
-
-      .controls { gap: 5px; margin-top: 8px; }
-      button { padding: 7px 9px; font-size: 11px; }
-      .icon-btn { width: 32px; height: 32px; min-width: 32px; font-size: 15px; }
-
-      .warning-banner { bottom: 10px; font-size: 11px; padding: 8px 10px; max-width: calc(100vw - 20px); }
-
-      #editorPanel {
-        top: auto;
-        bottom: 8px;
-        left: 8px;
-        width: min(200px, calc(100vw - 16px));
-        max-height: 34vh;
-        padding: 10px;
-      }
-
-      .unlock-tray {
-        bottom: 54px;
-        width: min(255px, calc(100vw - 16px));
-        padding: 8px 9px;
-      }
-
-      .modal {
-        padding: 10px;
-      }
-
-      .modal-card {
-        width: 100%;
-        max-width: 340px;
-        padding: 16px 14px;
-        border-radius: 18px;
-      }
-
-      .modal-card h2 { font-size: 22px; }
-      .modal-card p { font-size: 13px; margin: 8px 0 10px; }
-      .modal-card input { padding: 10px 12px; font-size: 15px; margin: 8px 0 10px; }
-
-      .win-card {
-        padding: 18px 14px;
-        border-radius: 18px;
-      }
-
-      .win-card h2 { font-size: 24px; }
-      .win-grid { grid-template-columns: 1fr; gap: 8px; }
-    }
-
-    @media (max-width: 520px) {
-      .topbar,
-      .topbar.compact {
-        width: min(160px, calc(100vw - 14px));
-      }
-
-      .quest-panel,
-      .quest-panel.compact,
-      #questPanel.collapsed {
-        width: min(160px, calc(100vw - 14px));
-      }
-
-      #editorPanel {
-        width: min(170px, calc(100vw - 14px));
-      }
-
-      .unlock-tray {
-        width: min(220px, calc(100vw - 14px));
-      }
-
-      .quest-title {
-        font-size: 12px;
-      }
-
-      .topbar h1 {
-        font-size: 13px;
-      }
+    .gps-dot.near{background:var(--red);box-shadow:0 0 0 3px rgba(0,0,0,.12),0 0 22px rgba(255,59,48,.55)}
+    .egg-icon{font-size:26px;line-height:30px;text-align:center;filter:drop-shadow(0 2px 3px rgba(0,0,0,.2))}
+    .captured-icon{font-size:22px;line-height:28px;text-align:center}
+    .leaflet-popup-content-wrapper{border-radius:14px}
+    @media (max-width:600px){
+      #title{font-size:18px}
+      #bottomPanel{left:8px;right:8px;bottom:8px;padding:10px}
+      .pill{font-size:12px}
+      button{font-size:13px}
     }
   </style>
 </head>
 <body>
+<div id="app">
+  <div id="topBar">
+    <div id="title">🥚 Easter Egg Hunt 🐇</div>
+    <div id="subTitle">Tap title 5 times for admin • tap anywhere to start music</div>
+    <div id="infoBar">
+      <div class="pill">Player: <span id="playerNameText">Guest</span></div>
+      <div class="pill">Score: <span id="scoreText">0</span></div>
+      <div class="pill">Captured: <span id="capturedText">0</span>/<span id="totalEggsText">0</span></div>
+    </div>
+  </div>
+
   <div id="map"></div>
-  <div id="confettiLayer" aria-hidden="true"></div>
 
-  <div class="panel topbar" id="topbar">
-    <div class="topbar-header">
-      <h1 id="titleTapTarget">🐰 Easter Realm Hunt</h1>
-      <div style="display:flex; gap:8px;">
-        <button class="icon-btn" id="musicToggleBtn" title="Toggle music">🎵</button>
-        <button class="icon-btn" id="compactTopbarBtn" title="Minimize panel">➖</button>
-      </div>
-    </div>
-    <div class="small">Walk inside the play zone, discover hidden places, solve clues, and collect 15 magical eggs.</div>
-    <div class="tap-hint" id="tapHint"> </div>
-    <div class="overlay-edit-tip" id="overlayEditTip" style="display:none;">Pink dots resize the overlay. Blue dot moves the whole overlay. Changes save on this device.</div>
-    <div class="overlay-edit-tip" id="overlayStatus" style="display:none;"></div>
-    <div class="player-chip" id="playerChip">Player: Adventurer</div>
-    <div class="heat-wrap">
-      <div class="heat-top">
-        <span>🎯 Hot / Cold</span>
-        <span id="heatLabel">Searching…</span>
-      </div>
-      <div class="heat-track">
-        <div class="heat-bar" id="heatBar"></div>
-      </div>
-    </div>
-    <div class="stats">
-      <div class="stat"><strong id="foundCount">0</strong><span>Eggs Found</span></div>
-      <div class="stat"><strong id="totalCount">15</strong><span>Total Stops</span></div>
-      <div class="stat"><strong id="zoneStatus">IN</strong><span>Zone Status</span></div>
-      <div class="stat"><strong id="distanceInfo">--</strong><span>Next Stop</span></div>
-    </div>
-
-    <div class="controls" id="publicControls">
-      <button id="locateBtn">📍 Find Me</button>
-      <button class="secondary" id="toggleQuestBtn">📜 Hide Quests</button>
-    </div>
-
-    <div class="controls" id="adminControls">
-      <button class="ghost" id="closeAdminBtn">✖ Close Admin</button>
-      <button class="secondary" id="showAllBtn">🙈 Hide Stops</button>
-      <button class="secondary" id="overlayBtn">🖼️ Overlay On</button>
-      <button class="secondary" id="overlayEditBtn">📐 Edit Overlay Off</button>
-      <button class="ghost" id="saveOverlayBtn">💾 Save Overlay</button>
-      <button class="ghost" id="exportOverlayBtn">📤 Export Overlay JSON</button>
-      <button class="ghost" id="importOverlayBtn">📥 Import Overlay JSON</button>
-      <input id="importOverlayInput" type="file" accept="application/json,.json" style="display:none;" />
-      <button class="ghost" id="resetOverlayBtn">↺ Reset Overlay</button>
-      <button class="secondary" id="editModeBtn">✏️ Edit Stops Off</button>
-      <button class="ghost" id="exportStopsBtn">💾 Export Stops</button>
-      <button class="ghost" id="importStopsBtn">📂 Import Stops</button>
-      <input id="importStopsInput" type="file" accept="application/json,.json" style="display:none;" />
-      <button class="ghost" id="exportResultsBtn">🏁 Export Results</button>
-      <button class="ghost" id="resetBtn">🔄 Reset Game</button>
+  <div id="bottomPanel">
+    <div id="statusText">Loading map and GPS...</div>
+    <div class="btnRow">
+      <button id="captureBtn" disabled>Capture Egg</button>
+      <button class="btn" id="centerBtn">Center Me</button>
+      <button class="btn" id="changePlayerBtn">Change Player</button>
+      <button class="btn" id="resetPlayerBtn">Reset My Captures</button>
+      <button class="btn" id="musicBtn">Music: ON</button>
     </div>
   </div>
 
-  <div class="panel quest-panel" id="questPanel"></div>
-
-  <div class="unlock-tray" id="unlockTray">
-    <div style="min-width:0; flex:1;">
-      <div style="font-weight:800;" id="unlockTrayTitle">Nearby stop ready</div>
-      <div class="small" id="unlockTrayText">Stand on the glowing spot to open.</div>
+  <div id="adminPanel">
+    <h3>Admin Menu</h3>
+    <div class="small">Turn on Add Mode, then click the map to add eggs. Use Download JSON to save your updated hard-coded list.</div>
+    <div class="btnRow">
+      <button class="btn" id="toggleHideBtn">Hide Eggs: OFF</button>
+      <button class="btn" id="toggleAddModeBtn">Add Mode: OFF</button>
+      <button class="btn" id="reloadJsonBtn">Reload File</button>
+      <button class="btn" id="closeAdminBtn">Close</button>
     </div>
-    <button id="unlockNearestBtn">Open</button>
+    <div class="btnRow">
+      <button class="btn" id="clearEggsBtn">Clear All Eggs</button>
+      <button class="btn" id="applyJsonBtn">Apply JSON</button>
+      <button class="btn" id="downloadJsonBtn">Download JSON</button>
+    </div>
+    <div style="margin-top:10px"><textarea id="eggJson"></textarea></div>
+    <div class="small" style="margin-top:8px">JSON format: [{"id":"egg1","lat":43.6171,"lng":-79.5749}]</div>
   </div>
 
-  <div class="panel" id="editorPanel">
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px;">
-      <strong>Stop Editor</strong>
-      <button id="closeEditorBtn" style="padding:6px 10px;">✕</button>
-    </div>
-    <div class="small" id="editorStopId">No stop selected</div>
-    <div style="margin-top:10px; display:grid; gap:8px;">
-      <input id="editName" type="text" placeholder="Stop name" style="width:100%; border:2px solid #eee; border-radius:12px; padding:10px;" />
-      <input id="editZone" type="text" placeholder="Zone" style="width:100%; border:2px solid #eee; border-radius:12px; padding:10px;" />
-      <input id="editReward" type="text" placeholder="Reward" style="width:100%; border:2px solid #eee; border-radius:12px; padding:10px;" />
-      <input id="editRadius" type="number" placeholder="Radius (m)" style="width:100%; border:2px solid #eee; border-radius:12px; padding:10px;" />
-      <textarea id="editClue" placeholder="Clue" rows="3" style="width:100%; border:2px solid #eee; border-radius:12px; padding:10px; resize:vertical;"></textarea>
-      <textarea id="editChallenge" placeholder="Challenge" rows="4" style="width:100%; border:2px solid #eee; border-radius:12px; padding:10px; resize:vertical;"></textarea>
-      <div class="small" id="editCoords">Lat: -- | Lng: --</div>
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button id="saveStopBtn">Save Stop</button>
-        <button class="secondary" id="copyCoordsBtn">Copy Coords</button>
-        <button class="ghost" id="deleteStopBtn">Delete Stop</button>
-      </div>
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <button class="secondary" id="addStopAtCenterBtn">➕ Add Stop At Center</button>
-      </div>
+  <div id="celebration">
+    <div id="celebrationCard">
+      <div style="font-size:56px; margin-bottom:8px;">🥚✨🎉</div>
+      <h2>Egg Captured!</h2>
+      <div id="celebrationMessage">Amazing job! You found a magical egg.</div>
+      <div style="margin-top:12px; font-size:40px;">🐰🌈⭐</div>
     </div>
   </div>
 
-  <div class="warning-banner" id="warningBanner">🚫 You have left the live play area. Return onto the themed overlay map to keep hunting.</div>
-
-  <div class="modal" id="introModal">
-    <div class="modal-card">
-      <div style="font-size:52px;">🥚✨🐇</div>
-      <h2>Welcome to the Lost Easter Realm</h2>
-      <p>Type your player name, then walk to each magical spot in the play area. When you are close enough, the challenge unlocks.</p>
-      <input id="playerNameInput" type="text" placeholder="Enter player name" maxlength="24" autofocus />
-      <button id="startGameBtn">Start the Hunt</button>
-    </div>
-  </div>
-
-  <div class="win-screen" id="winScreen">
-    <div class="win-card">
-      <div style="font-size:58px; margin-bottom:8px;">🏆🥚✨</div>
-      <h2>You Won!</h2>
-      <div class="small" style="font-size:15px; opacity:0.95;">The Easter Realm has been completed.</div>
-      <div class="win-grid">
-        <div class="win-stat"><strong id="winEggs">0/0</strong><span>Eggs Found</span></div>
-        <div class="win-stat"><strong id="winTime">0:00</strong><span>Total Time</span></div>
-        <div class="win-stat"><strong id="winScore">100%</strong><span>Score</span></div>
-      </div>
-      <p id="winMessage" style="margin:0 0 18px;">Amazing job!</p>
-      <button id="playAgainBtn">Play Again</button>
-    </div>
-  </div>
-
-  <script>
-    const map = L.map('map', { zoomControl: true }).setView([43.617757, -79.575952], 18);
-
-    const baseTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 22,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    const OVERLAY_IMAGE = 'play-zone.png';
-    const topLeft = [43.617757, -79.575952];
-    const topRight = [43.617914, -79.570055];
-    const bottomLeft = [43.613873, -79.575751];
-
-    const OVERLAY_STORAGE_KEY = 'easter_realm_overlay_v1';
-    const savedOverlay = JSON.parse(localStorage.getItem(OVERLAY_STORAGE_KEY) || 'null');
-
-
-    function deriveOverlayCorners(topLeftPoint, topRightPoint, bottomLeftPoint) {
-      const [lat1, lng1] = topLeftPoint;
-      const [lat2, lng2] = topRightPoint;
-      const [lat3, lng3] = bottomLeftPoint;
-      return {
-        topLeft: [lat1, lng1],
-        topRight: [lat2, lng2],
-        bottomLeft: [lat3, lng3],
-        bottomRight: [lat3 + (lat2 - lat1), lng3 + (lng2 - lng1)]
-      };
-    }
-
-    let overlayCorners = savedOverlay || deriveOverlayCorners(topLeft, topRight, bottomLeft);
-
-    let imageOverlay = null;
-    let overlayEnabled = true;
-    let overlayEditMode = false;
-    let overlayHandleMarkers = [];
-
-    function saveOverlayState() {
-      localStorage.setItem(OVERLAY_STORAGE_KEY, JSON.stringify(overlayCorners));
-    }
-
-    function resetOverlayState() {
-      overlayCorners = deriveOverlayCorners(topLeft, topRight, bottomLeft);
-      saveOverlayState();
-      refreshOverlay();
-    }
-
-    function getOverlayExportData() {
-      return {
-        topLeft: overlayCorners.topLeft,
-        topRight: overlayCorners.topRight,
-        bottomLeft: overlayCorners.bottomLeft
-      };
-    }
-
-    async function exportOverlayJson() {
-      const payload = JSON.stringify(getOverlayExportData(), null, 2);
-      const fileName = 'easter_overlay_position.json';
-      const blob = new Blob([payload], { type: 'application/json' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-      return true;
-    }
-
-    function applyOverlayImportData(data) {
-      if (!data || !Array.isArray(data.topLeft) || !Array.isArray(data.topRight) || !Array.isArray(data.bottomLeft)) {
-        throw new Error('Invalid overlay JSON format.');
-      }
-
-      overlayCorners = {
-        topLeft: [Number(data.topLeft[0]), Number(data.topLeft[1])],
-        topRight: [Number(data.topRight[0]), Number(data.topRight[1])],
-        bottomLeft: [Number(data.bottomLeft[0]), Number(data.bottomLeft[1])]
-      };
-
-      saveOverlayState();
-      refreshOverlay();
-    }
-
-    async function importOverlayJsonFile(file) {
-      if (!file) return false;
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        applyOverlayImportData(data);
-        return true;
-      } catch (err) {
-        console.error('Import overlay failed:', err);
-        alert('That overlay JSON file could not be loaded.');
-        return false;
-      }
-    }
-
-    function clearOverlayHandles() {
-      overlayHandleMarkers.forEach(marker => map.removeLayer(marker));
-      overlayHandleMarkers = [];
-    }
-
-    function buildOverlayBounds() {
-      return L.latLngBounds([
-        overlayCorners.topLeft,
-        overlayCorners.topRight,
-        overlayCorners.bottomRight,
-        overlayCorners.bottomLeft
-      ]);
-    }
-
-    function createHandle(latlng, kind, onDrag) {
-      const marker = L.marker(latlng, {
-        draggable: true,
-        keyboard: false,
-        zIndexOffset: 2000,
-        icon: L.divIcon({
-          className: '',
-          html: `<div class="overlay-handle ${kind}"></div>`,
-          iconSize: kind === 'center' ? [22, 22] : [20, 20],
-          iconAnchor: kind === 'center' ? [11, 11] : [10, 10]
-        })
-      }).addTo(map);
-      marker.on('drag', onDrag);
-      marker.on('dragend', () => {
-        saveOverlayState();
-        refreshOverlay();
-      });
-      overlayHandleMarkers.push(marker);
-      return marker;
-    }
-
-    function addOverlayHandles() {
-      if (!overlayEditMode) return;
-      clearOverlayHandles();
-
-      createHandle(overlayCorners.topLeft, 'corner', (e) => {
-        overlayCorners.topLeft = [e.latlng.lat, e.latlng.lng];
-        overlayCorners.bottomRight = [overlayCorners.bottomLeft[0] + (overlayCorners.topRight[0] - overlayCorners.topLeft[0]), overlayCorners.bottomLeft[1] + (overlayCorners.topRight[1] - overlayCorners.topLeft[1])];
-        refreshOverlay(false);
-      });
-
-      createHandle(overlayCorners.topRight, 'corner', (e) => {
-        overlayCorners.topRight = [e.latlng.lat, e.latlng.lng];
-        overlayCorners.bottomRight = [overlayCorners.bottomLeft[0] + (overlayCorners.topRight[0] - overlayCorners.topLeft[0]), overlayCorners.bottomLeft[1] + (overlayCorners.topRight[1] - overlayCorners.topLeft[1])];
-        refreshOverlay(false);
-      });
-
-      createHandle(overlayCorners.bottomLeft, 'corner', (e) => {
-        overlayCorners.bottomLeft = [e.latlng.lat, e.latlng.lng];
-        overlayCorners.bottomRight = [overlayCorners.bottomLeft[0] + (overlayCorners.topRight[0] - overlayCorners.topLeft[0]), overlayCorners.bottomLeft[1] + (overlayCorners.topRight[1] - overlayCorners.topLeft[1])];
-        refreshOverlay(false);
-      });
-
-      const center = [
-        (overlayCorners.topLeft[0] + overlayCorners.topRight[0] + overlayCorners.bottomLeft[0] + overlayCorners.bottomRight[0]) / 4,
-        (overlayCorners.topLeft[1] + overlayCorners.topRight[1] + overlayCorners.bottomLeft[1] + overlayCorners.bottomRight[1]) / 4
-      ];
-
-      createHandle(center, 'center', (e) => {
-        const nextCenter = [e.latlng.lat, e.latlng.lng];
-        const latDiff = nextCenter[0] - center[0];
-        const lngDiff = nextCenter[1] - center[1];
-        overlayCorners = {
-          topLeft: [overlayCorners.topLeft[0] + latDiff, overlayCorners.topLeft[1] + lngDiff],
-          topRight: [overlayCorners.topRight[0] + latDiff, overlayCorners.topRight[1] + lngDiff],
-          bottomLeft: [overlayCorners.bottomLeft[0] + latDiff, overlayCorners.bottomLeft[1] + lngDiff],
-          bottomRight: [overlayCorners.bottomRight[0] + latDiff, overlayCorners.bottomRight[1] + lngDiff]
-        };
-        refreshOverlay(false);
-      });
-    }
-
-    function createImageOverlay() {
-      if (imageOverlay) map.removeLayer(imageOverlay);
-
-      if (L.imageOverlay && typeof L.imageOverlay.rotated === 'function') {
-        imageOverlay = L.imageOverlay.rotated(
-          OVERLAY_IMAGE,
-          overlayCorners.topLeft,
-          overlayCorners.topRight,
-          overlayCorners.bottomLeft,
-          { opacity: 0.96, interactive: false }
-        );
-      } else {
-        const lats = [overlayCorners.topLeft[0], overlayCorners.topRight[0], overlayCorners.bottomRight[0], overlayCorners.bottomLeft[0]];
-        const lngs = [overlayCorners.topLeft[1], overlayCorners.topRight[1], overlayCorners.bottomRight[1], overlayCorners.bottomLeft[1]];
-        imageOverlay = L.imageOverlay(OVERLAY_IMAGE, [
-          [Math.min(...lats), Math.min(...lngs)],
-          [Math.max(...lats), Math.max(...lngs)]
-        ], { opacity: 0.96, interactive: false });
-      }
-
-      imageOverlay.on('error', () => {
-        overlayEnabled = false;
-        const overlayBtn = document.getElementById('overlayBtn');
-        if (overlayBtn) overlayBtn.textContent = '🖼️ Overlay Missing';
-        baseTiles.setOpacity(1);
-      });
-
-      imageOverlay.addTo(map);
-      return imageOverlay;
-    }
-
-    function refreshOverlay(updateHandles = true) {
-      overlayCorners.bottomRight = [overlayCorners.bottomLeft[0] + (overlayCorners.topRight[0] - overlayCorners.topLeft[0]), overlayCorners.bottomLeft[1] + (overlayCorners.topRight[1] - overlayCorners.topLeft[1])];
-      createImageOverlay();
-      if (playZone) {
-        playZone.setLatLngs([
-          overlayCorners.topLeft,
-          overlayCorners.topRight,
-          overlayCorners.bottomRight,
-          overlayCorners.bottomLeft
-        ]);
-      }
-      if (updateHandles) addOverlayHandles();
-    }
-
-    createImageOverlay();
-
-    const playZone = L.polygon([
-      overlayCorners.topLeft,
-      overlayCorners.topRight,
-      overlayCorners.bottomRight,
-      overlayCorners.bottomLeft,
-      overlayCorners.topLeft
-    ], {
-      color: 'transparent',
-      weight: 0,
-      opacity: 0,
-      fillColor: 'transparent',
-      fillOpacity: 0
-    }).addTo(map);
-
-    map.fitBounds(buildOverlayBounds(), { padding: [25, 25] });
-
-    const LOCATIONS = [
+  <audio id="bgMusic" loop preload="auto">
+    <source src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8d6f99c0f.mp3?filename=fun-kids-loop-112785.mp3" type="audio/mpeg">
+  </audio>
+  <audio id="captureSound" preload="auto">
+    <source src="https://cdn.pixabay.com/download/audio/2022/03/10/audio_c5d1656c66.mp3?filename=success-fanfare-trumpets-6185.mp3" type="audio/mpeg">
+  </audio>
+  <audio id="sparkleSound" preload="auto">
+    <source src="https://cdn.pixabay.com/download/audio/2022/03/24/audio_7d7a6cf2c1.mp3?filename=magical-transition-124008.mp3" type="audio/mpeg">
+  </audio>
+</div>
+<script>
+const CAPTURE_DISTANCE_METERS = 15;
+const JSON_FILE = 'eggs.json';
+const DEFAULT_CENTER = [43.6165, -79.5728];
+const DEFAULT_ZOOM = 18;
+const DEFAULT_EGGS = [
 {
-    "id": 1,
-    "name": "Bunny HQ",
-    "lat": 43.616286,
-    "lng": -79.572141,
-    "zone": "Home Base",
-    "icon": "🐰",
-    "type": "intro",
-    "challenge": "The Easter eggs have scattered across the realm. Your first task: step into adventure and greet the Bunny Keeper.",
-    "clue": "Step outside the house",
-    "reward": "Starter Egg",
-    "radius": 24,
-    "answer": ""
+    "id": "egg1",
+    "lat": 43.614784,
+    "lng": -79.572773
   },
   {
-    "id": 2,
-    "name": "Talking Mailbox",
-    "lat": 43.614963,
-    "lng": -79.573127,
-    "zone": "Home Base",
-    "icon": "📬",
-    "type": "riddle",
-    "challenge": "I hold secrets but do not talk. Tap to wake me and hear the whisper of the trail.",
-    "clue": "What receives messages but never walks?",
-    "reward": "Cherry Egg",
-    "radius": 20,
-    "answer": "mailbox"
+    "id": "egg2",
+    "lat": 43.614809,
+    "lng": -79.572768
   },
   {
-    "id": 3,
-    "name": "Candy Compass",
-    "lat": 43.615916,
-    "lng": -79.57233,
-    "zone": "Pathway",
-    "icon": "🧭",
-    "type": "direction",
-    "challenge": "The compass twirls in sugar sparkles and points toward the big open field.",
-    "clue": "Head toward the grassy world where the bunny kingdom begins.",
-    "reward": "Mint Egg",
-    "radius": 20,
-    "answer": ""
+    "id": "egg3",
+    "lat": 43.61479,
+    "lng": -79.572864
   },
   {
-    "id": 4,
-    "name": "Whispering Tree",
-    "lat": 43.614773,
-    "lng": -79.57274,
-    "zone": "Enchanted Forest",
-    "icon": "🌳",
-    "type": "listen",
-    "challenge": "The old tree tells you: “Find the nest where treasure rests.”",
-    "clue": "Nearby lies a place where little treasures sleep.",
-    "reward": "Forest Egg",
-    "radius": 18,
-    "answer": ""
+    "id": "egg4",
+    "lat": 43.614813,
+    "lng": -79.572914
   },
   {
-    "id": 5,
-    "name": "Hidden Nest",
-    "lat": 43.616497,
-    "lng": -79.572628,
-    "zone": "Enchanted Forest",
-    "icon": "🪺",
-    "type": "quiz",
-    "challenge": "Which animal is famous for hiding Easter eggs? A) Fox B) Bunny C) Turtle",
-    "clue": "Follow the footprints to the next secret.",
-    "reward": "Nest Egg",
-    "radius": 18,
-    "answer": "bunny"
+    "id": "egg5",
+    "lat": 43.614839,
+    "lng": -79.572957
   },
   {
-    "id": 6,
-    "name": "Golden Carrot Patch",
-    "lat": 43.616532,
-    "lng": -79.572489,
-    "zone": "Golden Field",
-    "icon": "🥕",
-    "type": "collect",
-    "challenge": "Collect 3 magic carrots by tapping the carrot button three times.",
-    "clue": "Footprints bounce toward play and laughter.",
-    "reward": "Carrot Egg",
-    "radius": 22,
-    "answer": ""
+    "id": "egg6",
+    "lat": 43.614893,
+    "lng": -79.573055
   },
   {
-    "id": 7,
-    "name": "Bunny Footprint Trail",
-    "lat": 43.616384,
-    "lng": -79.572451,
-    "zone": "Golden Field",
-    "icon": "🐾",
-    "type": "trail",
-    "challenge": "The tracks point to a place of slides, swings, and climbing fun.",
-    "clue": "The playground kingdom awaits.",
-    "reward": "Trail Egg",
-    "radius": 18,
-    "answer": ""
+    "id": "egg7",
+    "lat": 43.61493,
+    "lng": -79.573012
   },
   {
-    "id": 8,
-    "name": "Slide of Secrets",
-    "lat": 43.616418,
-    "lng": -79.572347,
-    "zone": "Playground Kingdom",
-    "icon": "🛝",
-    "type": "action",
-    "challenge": "Bonus challenge: go on the slide in real life, then tap “Done”.",
-    "clue": "The swings nearby are moving with magic.",
-    "reward": "Slide Egg",
-    "radius": 18,
-    "answer": ""
+    "id": "egg8",
+    "lat": 43.614951,
+    "lng": -79.573068
   },
   {
-    "id": 9,
-    "name": "Swing Challenge",
-    "lat": 43.616234,
-    "lng": -79.572218,
-    "zone": "Playground Kingdom",
-    "icon": "🎠",
-    "type": "timer",
-    "challenge": "Stay in this zone for 10 seconds to calm the fluttering egg spirits.",
-    "clue": "A coded message hangs nearby.",
-    "reward": "Sky Egg",
-    "radius": 18,
-    "answer": ""
+    "id": "egg9",
+    "lat": 43.614969,
+    "lng": -79.573116
   },
   {
-    "id": 10,
-    "name": "Monkey Bar Code",
-    "lat": 43.616247,
-    "lng": -79.585669,
-    "zone": "Playground Kingdom",
-    "icon": "🧩",
-    "type": "scramble",
-    "challenge": "Unscramble this word: YBUNN",
-    "clue": "A guardian protects the next egg.",
-    "reward": "Puzzle Egg",
-    "radius": 18,
-    "answer": "bunny"
+    "id": "egg10",
+    "lat": 43.614998,
+    "lng": -79.573175
   },
   {
-    "id": 11,
-    "name": "Egg Guardian",
-    "lat": 43.616296,
-    "lng": -79.572245,
-    "zone": "Playground Kingdom",
-    "icon": "🛡️",
-    "type": "quiz",
-    "challenge": "What color do you get by mixing red and yellow?",
-    "clue": "Return toward the long field where colors fall from the sky.",
-    "reward": "Guardian Egg",
-    "radius": 18,
-    "answer": "orange"
+    "id": "egg11",
+    "lat": 43.615023,
+    "lng": -79.573245
   },
   {
-    "id": 12,
-    "name": "Rainbow Drop Zone",
-    "lat": 43.614799,
-    "lng": -79.572786,
-    "zone": "Golden Field",
-    "icon": "🌈",
-    "type": "tap",
-    "challenge": "Tap the falling egg before it escapes. Ready? Tap “Catch Egg”.",
-    "clue": "One egg is fast. Catch it if you can.",
-    "reward": "Rainbow Egg",
-    "radius": 18,
-    "answer": ""
+    "id": "egg12",
+    "lat": 43.614988,
+    "lng": -79.573288
   },
   {
-    "id": 13,
-    "name": "Speed Egg",
-    "lat": 43.615683,
-    "lng": -79.572566,
-    "zone": "Golden Field",
-    "icon": "⚡",
-    "type": "speed",
-    "challenge": "Reach this point and claim the egg before the timer ends. Tap “Start 8s Timer”.",
-    "clue": "A giant invisible egg hides nearby in the grass.",
-    "reward": "Lightning Egg",
-    "radius": 18,
-    "answer": ""
+    "id": "egg13",
+    "lat": 43.614934,
+    "lng": -79.573355
   },
   {
-    "id": 14,
-    "name": "Giant Invisible Egg",
-    "lat": 43.616375,
-    "lng": -79.57221,
-    "zone": "Golden Field",
-    "icon": "👻",
-    "type": "search",
-    "challenge": "The giant egg cannot be seen, only sensed. Walk around and stand still to reveal it.",
-    "clue": "All clues lead back to the final treasure.",
-    "reward": "Ghost Egg",
-    "radius": 28,
-    "answer": ""
+    "id": "egg14",
+    "lat": 43.615077,
+    "lng": -79.573186
   },
   {
-    "id": 15,
-    "name": "Golden Egg Temple",
-    "lat": 43.616609,
-    "lng": -79.572693,
-    "zone": "Final Shrine",
-    "icon": "🥇",
-    "type": "final",
-    "challenge": "Final riddle: Who hid the eggs all over the realm?",
-    "clue": "You have completed the hunt!",
-    "reward": "Golden Egg",
-    "radius": 20,
-    "answer": "bunny"
+    "id": "egg15",
+    "lat": 43.615126,
+    "lng": -79.573138
+  },
+  {
+    "id": "egg16",
+    "lat": 43.614874,
+    "lng": -79.573393
   }
 ];
 
-    const STORAGE_KEY = 'easter_realm_game_v2';
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+let eggsData = [];
+let playerName = '';
+let playerCaptured = {};
+let hiddenEggs = false;
+let addMode = false;
+let map, userMarker, accuracyCircle;
+let musicStarted = false;
+let userLatLng = null;
+let eggMarkers = [];
+let nearestAvailableEgg = null;
+let titleTapCount = 0;
+let titleTapTimer = null;
 
-    const state = {
-      playerName: saved.playerName || 'Adventurer',
-      found: new Set(saved.found || []),
-      userLatLng: null,
-      inZone: true,
-      userMarker: null,
-      accuracyCircle: null,
-      showAllStops: saved.showAllStops !== undefined ? saved.showAllStops : true,
-      timerRunning: false,
-      editMode: false,
-      selectedStopId: null,
-      adminVisible: false,
-      questCollapsed: saved.questCollapsed !== undefined ? saved.questCollapsed : (window.innerWidth <= 800),
-      tapUnlockCount: 0,
-      tapUnlockTimer: null,
-      startedAt: saved.startedAt || null,
-      musicEnabled: saved.musicEnabled !== undefined ? saved.musicEnabled : true,
-      compactTopbar: saved.compactTopbar !== undefined ? saved.compactTopbar : (window.innerWidth <= 800),
-      nearestUnlockId: null,
-      audioReady: false,
-      audioCtx: null,
-      bgMusicTimer: null,
-      proximityTimer: null,
-      proximityTickMs: null,
-      melodyStep: 0,
-      lastZone: null,
-      radarPulse: null,
-      radarCircle: null,
-      winShown: false
-    };
+function distanceMeters(a,b){ return map.distance(a,b); }
+function getPlayerStorageKey(){ return 'egg_hunt_captures_' + playerName.toLowerCase().replace(/\s+/g,'_'); }
+function escapeHtml(text){ return String(text).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;'); }
 
-    document.getElementById('playerChip').textContent = `Player: ${state.playerName}`;
-    if (saved.playerName) document.getElementById('introModal').style.display = 'none';
-    enforceMobileLayout();
+function askPlayerName(){
+  const saved = localStorage.getItem('egg_hunt_player_name') || '';
+  const name = prompt('Enter player name:', saved || 'Player 1');
+  playerName = (name || 'Guest').trim() || 'Guest';
+  localStorage.setItem('egg_hunt_player_name', playerName);
+  loadPlayerCaptures();
+  updatePlayerUI();
+}
 
-    function persist() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        playerName: state.playerName,
-        found: [...state.found],
-        startedAt: state.startedAt,
-        showAllStops: state.showAllStops,
-        questCollapsed: state.questCollapsed,
-        musicEnabled: state.musicEnabled,
-        compactTopbar: state.compactTopbar
-      }));
+function loadPlayerCaptures(){
+  try { playerCaptured = JSON.parse(localStorage.getItem(getPlayerStorageKey()) || '{}'); }
+  catch { playerCaptured = {}; }
+}
+
+function savePlayerCaptures(){
+  localStorage.setItem(getPlayerStorageKey(), JSON.stringify(playerCaptured));
+}
+
+function updatePlayerUI(){
+  document.getElementById('playerNameText').textContent = playerName;
+  const capturedCount = eggsData.filter(e => !!playerCaptured[e.id]).length;
+  document.getElementById('scoreText').textContent = capturedCount;
+  document.getElementById('capturedText').textContent = capturedCount;
+  document.getElementById('totalEggsText').textContent = eggsData.length;
+}
+
+function makeGpsIcon(isNear){
+  return L.divIcon({
+    className:'',
+    html:`<div class="gps-dot ${isNear ? 'near' : ''}"></div>`,
+    iconSize:[24,24],
+    iconAnchor:[12,12]
+  });
+}
+
+function makeEggIcon(captured){
+  return L.divIcon({
+    className:'',
+    html: captured ? '<div class="captured-icon">✅</div>' : '<div class="egg-icon">🥚</div>',
+    iconSize:[30,30],
+    iconAnchor:[15,15]
+  });
+}
+
+function refreshEggTextarea(){
+  document.getElementById('eggJson').value = JSON.stringify(eggsData, null, 2);
+}
+
+function renderEggs(){
+  eggMarkers.forEach(m => map.removeLayer(m));
+  eggMarkers = [];
+
+  eggsData.forEach(egg => {
+    const captured = !!playerCaptured[egg.id];
+    if (hiddenEggs && !captured) return;
+
+    const marker = L.marker([egg.lat, egg.lng], { icon: makeEggIcon(captured) }).addTo(map);
+    marker.bindPopup(`
+      <div style="min-width:180px">
+        <strong>${escapeHtml(egg.id)}</strong><br>
+        ${captured ? 'Already captured by this player ✅' : 'Egg available 🥚'}<br>
+        <span style="font-size:12px;color:#666">${egg.lat.toFixed(6)}, ${egg.lng.toFixed(6)}</span>
+      </div>
+    `);
+    eggMarkers.push(marker);
+  });
+
+  updatePlayerUI();
+}
+
+function updateProximity(){
+  const status = document.getElementById('statusText');
+  const captureBtn = document.getElementById('captureBtn');
+  nearestAvailableEgg = null;
+
+  if (!userLatLng){
+    status.textContent = 'Waiting for GPS location...';
+    captureBtn.disabled = true;
+    return;
+  }
+
+  let closestEgg = null;
+  let closestDistance = Infinity;
+
+  eggsData.forEach(egg => {
+    if (playerCaptured[egg.id]) return;
+    const d = distanceMeters(userLatLng, L.latLng(egg.lat, egg.lng));
+    if (d < closestDistance){
+      closestDistance = d;
+      closestEgg = egg;
     }
+  });
 
-    function getEggIcon(emoji) {
-      return L.divIcon({
-        className: '',
-        html: `<div style="font-size:28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));">${emoji}</div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15],
-        popupAnchor: [0, -12]
-      });
+  const nearEgg = closestEgg && closestDistance <= CAPTURE_DISTANCE_METERS;
+  nearestAvailableEgg = nearEgg ? closestEgg : null;
+
+  if (userMarker) userMarker.setIcon(makeGpsIcon(hiddenEggs && nearEgg));
+
+  if (!closestEgg){
+    status.textContent = 'You captured all eggs for this player! 🎉';
+    captureBtn.disabled = true;
+    return;
+  }
+
+  if (nearEgg){
+    status.innerHTML = hiddenEggs
+      ? 'You are near a hidden egg! The GPS dot turned red. Tap <strong>Capture Egg</strong>.'
+      : `You are ${closestDistance.toFixed(1)} m from <strong>${escapeHtml(closestEgg.id)}</strong>. Tap <strong>Capture Egg</strong>.`;
+    captureBtn.disabled = false;
+  } else {
+    status.textContent = hiddenEggs
+      ? `Keep searching. The GPS dot will turn red within ${CAPTURE_DISTANCE_METERS} m of a hidden egg.`
+      : `Closest egg is ${closestDistance.toFixed(1)} m away. Move closer to capture it.`;
+    captureBtn.disabled = true;
+  }
+}
+
+function captureNearestEgg(){
+  if (!nearestAvailableEgg){
+    alert('No egg is close enough to capture yet.');
+    return;
+  }
+  if (playerCaptured[nearestAvailableEgg.id]){
+    alert('This egg was already captured by this player.');
+    return;
+  }
+  playerCaptured[nearestAvailableEgg.id] = true;
+  savePlayerCaptures();
+  renderEggs();
+  updateProximity();
+  showCelebration();
+}
+
+function playCaptureEffects(){
+  const captureSound = document.getElementById('captureSound');
+  const sparkleSound = document.getElementById('sparkleSound');
+  try {
+    captureSound.currentTime = 0;
+    captureSound.play().catch(() => {});
+  } catch {}
+  setTimeout(() => {
+    try {
+      sparkleSound.currentTime = 0;
+      sparkleSound.play().catch(() => {});
+    } catch {}
+  }, 180);
+}
+
+function startMusicOnce(){
+  if (musicStarted) return;
+  const bgMusic = document.getElementById('bgMusic');
+  bgMusic.volume = 0.35;
+  bgMusic.play().then(() => {
+    musicStarted = true;
+    document.getElementById('musicBtn').textContent = 'Music: ON';
+  }).catch(() => {});
+}
+
+function toggleMusic(){
+  const bgMusic = document.getElementById('bgMusic');
+  if (bgMusic.paused){
+    bgMusic.volume = 0.35;
+    bgMusic.play().then(() => {
+      musicStarted = true;
+      document.getElementById('musicBtn').textContent = 'Music: ON';
+    }).catch(() => {});
+  } else {
+    bgMusic.pause();
+    document.getElementById('musicBtn').textContent = 'Music: OFF';
+  }
+}
+
+function showCelebration(){
+  const wrap = document.getElementById('celebration');
+  const messages = [
+    'Amazing! You found a magical egg!',
+    'Eggcellent job! You caught it!',
+    'Woohoo! Another Easter treasure!',
+    'Super find! You captured the egg!',
+    'You did it! The bunny would be proud!'
+  ];
+  document.getElementById('celebrationMessage').textContent = messages[Math.floor(Math.random() * messages.length)];
+  wrap.style.display = 'flex';
+  playCaptureEffects();
+  spawnConfetti(220);
+  setTimeout(() => {
+    wrap.style.display = 'none';
+    clearConfetti();
+  }, 2600);
+}
+
+function spawnConfetti(count){
+  clearConfetti();
+  const colors = ['#ff4d4d','#ffd24d','#4dd2ff','#7dff7d','#c27dff','#ff7dc8'];
+  for (let i = 0; i < count; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = Math.random() * 100 + 'vw';
+    piece.style.top = (-20 - Math.random() * 100) + 'px';
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.animationDuration = (1.5 + Math.random() * 1.8) + 's';
+    document.body.appendChild(piece);
+  }
+}
+function clearConfetti(){ document.querySelectorAll('.confetti-piece').forEach(el => el.remove()); }
+
+async function loadEggsFromFile(){
+  try {
+    const res = await fetch(JSON_FILE + '?v=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('Could not load eggs.json');
+    const parsed = await res.json();
+    validateEggArray(parsed);
+    eggsData = parsed;
+  } catch (err) {
+    console.warn('Using default eggs because eggs.json could not be loaded.', err);
+    eggsData = structuredClone(DEFAULT_EGGS);
+  }
+  refreshEggTextarea();
+  if (map) {
+    renderEggs();
+    updateProximity();
+  }
+}
+
+function validateEggArray(parsed){
+  if (!Array.isArray(parsed)) throw new Error('JSON must be an array');
+  parsed.forEach(item => {
+    if (typeof item.id !== 'string' || typeof item.lat !== 'number' || typeof item.lng !== 'number') {
+      throw new Error('Each egg must contain id, lat, lng');
     }
+  });
+}
 
-    function getPlayerIcon() {
-      return L.divIcon({
-        className: '',
-        html: `<div class="player-marker"><div class="pulse"></div><div class="core"></div></div>`,
-        iconSize: [22, 22],
-        iconAnchor: [11, 11]
-      });
-    }
+function downloadEggJson(){
+  const blob = new Blob([JSON.stringify(eggsData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'eggs.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
-    function distanceMeters(aLat, aLng, bLat, bLng) {
-      const R = 6371000;
-      const toRad = n => n * Math.PI / 180;
-      const dLat = toRad(bLat - aLat);
-      const dLng = toRad(bLng - aLng);
-      const sa = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
-      return R * 2 * Math.atan2(Math.sqrt(sa), Math.sqrt(1 - sa));
-    }
+function resetCurrentPlayerCaptures(){
+  if (!confirm(`Reset captured eggs for ${playerName}?`)) return;
+  playerCaptured = {};
+  savePlayerCaptures();
+  renderEggs();
+  updateProximity();
+}
 
-    function formatMeters(m) {
-      if (m == null || Number.isNaN(m)) return '--';
-      return m < 1000 ? `${Math.round(m)}m` : `${(m / 1000).toFixed(2)}km`;
-    }
+function initMap(){
+  map = L.map('map').setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 22,
+    attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
 
-    function pointInPolygon(point, vs) {
-      const x = point[1];
-      const y = point[0];
-      let inside = false;
-      for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-        const xi = vs[i][1], yi = vs[i][0];
-        const xj = vs[j][1], yj = vs[j][0];
-        const intersect = ((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / ((yj - yi) || 1e-12) + xi);
-        if (intersect) inside = !inside;
-      }
-      return inside;
-    }
+  renderEggs();
 
-    function nextUnfoundLocation() {
-      const remaining = LOCATIONS.filter(l => !state.found.has(l.id));
-      if (!remaining.length) return null;
-      if (!state.userLatLng) return remaining[0];
-      return remaining.sort((a, b) => {
-        const da = distanceMeters(state.userLatLng.lat, state.userLatLng.lng, a.lat, a.lng);
-        const db = distanceMeters(state.userLatLng.lat, state.userLatLng.lng, b.lat, b.lng);
-        return da - db;
-      })[0];
-    }
+  map.on('click', function(e){
+    if (!addMode) return;
+    const id = 'egg' + (eggsData.length + 1);
+    eggsData.push({ id, lat: Number(e.latlng.lat.toFixed(6)), lng: Number(e.latlng.lng.toFixed(6)) });
+    refreshEggTextarea();
+    renderEggs();
+    updateProximity();
+  });
 
+  if ('geolocation' in navigator) {
+    navigator.geolocation.watchPosition(
+      pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const accuracy = pos.coords.accuracy || 0;
+        userLatLng = L.latLng(lat, lng);
 
-    function isMobileView() {
-      return window.innerWidth <= 800;
-    }
-
-    function enforceMobileLayout() {
-      if (!isMobileView()) return;
-      state.compactTopbar = true;
-      state.questCollapsed = true;
-      const editor = document.getElementById('editorPanel');
-      if (editor && !state.adminVisible) editor.style.display = 'none';
-    }
-
-    function applyUiState() {
-      document.getElementById('topbar').classList.toggle('compact', !!state.compactTopbar);
-      document.getElementById('questPanel').classList.toggle('collapsed', !!state.questCollapsed);
-      document.getElementById('musicToggleBtn').textContent = state.musicEnabled ? '🎵' : '🔇';
-      document.getElementById('toggleQuestBtn').textContent = state.questCollapsed ? '📜 Show Quests' : '📜 Hide Quests';
-      document.getElementById('compactTopbarBtn').textContent = state.compactTopbar ? '➕' : '➖';
-      persist();
-    }
-
-    function ensureAudio() {
-      if (state.audioCtx) {
-        if (state.audioCtx.state === 'suspended') state.audioCtx.resume();
-        state.audioReady = true;
-        return state.audioCtx;
-      }
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return null;
-      state.audioCtx = new AudioCtx();
-      state.audioReady = true;
-      return state.audioCtx;
-    }
-
-    function playTone(freq = 660, duration = 0.12, volume = 0.03, type = 'sine', delay = 0) {
-      if (!state.musicEnabled) return;
-      const ctx = ensureAudio();
-      if (!ctx) return;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const now = ctx.currentTime + delay;
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, now);
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(volume, now + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + duration + 0.02);
-    }
-
-    function playSuccessSound() {
-      if (!state.musicEnabled) return;
-      playTone(523.25, 0.12, 0.035, 'triangle', 0);
-      playTone(659.25, 0.14, 0.035, 'triangle', 0.08);
-      playTone(783.99, 0.18, 0.04, 'triangle', 0.16);
-    }
-
-    function playCelebrationMusic() {
-      if (!state.musicEnabled) return;
-      const notes = [783.99, 987.77, 1174.66, 1567.98, 1318.51, 1760];
-      notes.forEach((freq, i) => {
-        playTone(freq, 0.14 + (i * 0.01), 0.045, i % 2 === 0 ? 'triangle' : 'square', i * 0.1);
-      });
-      [391.99, 523.25, 659.25].forEach((freq, i) => {
-        playTone(freq, 0.34, 0.02, 'sine', 0.04 + (i * 0.12));
-      });
-    }
-
-    function launchConfetti(burstCount = 56) {
-      const layer = document.getElementById('confettiLayer');
-      if (!layer) return;
-      const palette = ['#ff6fb5', '#ffd74f', '#7fd7ff', '#87f0c0', '#b992ff', '#ffffff'];
-      for (let i = 0; i < burstCount; i += 1) {
-        const piece = document.createElement('div');
-        piece.className = 'confetti-piece';
-        piece.style.left = `${Math.random() * 100}vw`;
-        piece.style.background = palette[i % palette.length];
-        piece.style.width = `${8 + Math.random() * 8}px`;
-        piece.style.height = `${10 + Math.random() * 14}px`;
-        piece.style.opacity = String(0.7 + Math.random() * 0.3);
-        piece.style.setProperty('--drift', `${-110 + Math.random() * 220}px`);
-        piece.style.setProperty('--spin', `${360 + Math.random() * 900}deg`);
-        piece.style.animationDuration = `${1.8 + Math.random() * 1.8}s`;
-        piece.style.transform = `translate3d(0,0,0) rotate(${Math.random() * 180}deg)`;
-        layer.appendChild(piece);
-        setTimeout(() => piece.remove(), 4200);
-      }
-    }
-
-    function celebrateCorrectAnswer(rewardName = 'Easter Egg') {
-      launchConfetti();
-      playCelebrationMusic();
-      const tray = document.getElementById('unlockTrayText');
-      if (tray) tray.textContent = `🎉 Correct! You won the ${rewardName}!`;
-    }
-
-    function playUnlockSound() {
-      if (!state.musicEnabled) return;
-      playTone(740, 0.08, 0.03, 'square', 0);
-      playTone(988, 0.1, 0.03, 'square', 0.06);
-    }
-
-    function scheduleBackgroundMusic() {
-      if (!state.musicEnabled) return;
-      const melody = [523.25, 659.25, 783.99, 659.25, 587.33, 698.46, 880, 698.46];
-      const bass = [261.63, 329.63, 392, 329.63];
-      playTone(melody[state.melodyStep % melody.length], 0.18, 0.012, 'triangle', 0);
-      if (state.melodyStep % 2 === 0) {
-        playTone(bass[(state.melodyStep / 2) % bass.length | 0], 0.22, 0.007, 'sine', 0.01);
-      }
-      state.melodyStep += 1;
-    }
-
-    function startBackgroundMusic() {
-      if (!state.musicEnabled) return;
-      ensureAudio();
-      if (state.bgMusicTimer) return;
-      scheduleBackgroundMusic();
-      state.bgMusicTimer = setInterval(scheduleBackgroundMusic, 420);
-    }
-
-    function stopBackgroundMusic() {
-      if (state.bgMusicTimer) {
-        clearInterval(state.bgMusicTimer);
-        state.bgMusicTimer = null;
-      }
-    }
-
-    function setMusicEnabled(on) {
-      state.musicEnabled = !!on;
-      if (state.musicEnabled) startBackgroundMusic();
-      else stopBackgroundMusic();
-      applyUiState();
-    }
-
-    function getNearestUnfoundLocation() {
-      const next = nextUnfoundLocation();
-      if (!next || !state.userLatLng) return { loc: next, distance: null };
-      return {
-        loc: next,
-        distance: distanceMeters(state.userLatLng.lat, state.userLatLng.lng, next.lat, next.lng)
-      };
-    }
-
-    function stopProximityBeep() {
-      if (state.proximityTimer) {
-        clearTimeout(state.proximityTimer);
-        state.proximityTimer = null;
-      }
-      state.proximityTickMs = null;
-    }
-
-    function queueProximityBeep(intervalMs) {
-      if (!state.musicEnabled || state.showAllStops || !Number.isFinite(intervalMs)) return;
-      if (state.proximityTickMs === intervalMs && state.proximityTimer) return;
-      stopProximityBeep();
-      state.proximityTickMs = intervalMs;
-      const beepLoop = () => {
-        if (!state.musicEnabled || state.showAllStops || !state.nearestUnlockId) {
-          stopProximityBeep();
-          return;
-        }
-        playTone(880, 0.06, 0.02, 'square', 0);
-        state.proximityTimer = setTimeout(beepLoop, state.proximityTickMs);
-      };
-      state.proximityTimer = setTimeout(beepLoop, intervalMs);
-    }
-
-    function updateUnlockTray(loc, distance) {
-      const tray = document.getElementById('unlockTray');
-      if (!loc || !state.userLatLng || !state.inZone || distance > loc.radius) {
-        tray.style.display = 'none';
-        state.nearestUnlockId = null;
-        return;
-      }
-      state.nearestUnlockId = loc.id;
-      document.getElementById('unlockTrayTitle').textContent = `${loc.icon} ${loc.name} is ready`;
-      document.getElementById('unlockTrayText').textContent = `You are ${Math.max(0, Math.round(distance))}m away. Tap Open to unlock this stop.`;
-      tray.style.display = 'flex';
-    }
-
-    function updateProximityFeedback() {
-      const proximityNote = document.getElementById('tapHint');
-      const root = document.documentElement;
-      const { loc, distance } = getNearestUnfoundLocation();
-
-      if (!loc || !state.userLatLng || !state.inZone) {
-        root.style.setProperty('--player-pulse-duration', '1.6s');
-        root.style.setProperty('--player-pulse-scale', '1.35');
-        updateUnlockTray(null, null);
-        stopProximityBeep();
-        updateHeatMeter(null, null);
-        if (!state.adminVisible) proximityNote.textContent = '';
-        return;
-      }
-
-      maybePlayZoneSound(loc.zone);
-
-      const safeDistance = Math.max(0, distance);
-      const detectionEdge = Math.max(loc.radius * 3, 65);
-      const ratio = Math.max(0, Math.min(1, 1 - (safeDistance / detectionEdge)));
-      const pulseDuration = (1.65 - (ratio * 1.35)).toFixed(2) + 's';
-      const pulseScale = (1.25 + (ratio * 0.65)).toFixed(2);
-      root.style.setProperty('--player-pulse-duration', pulseDuration);
-      root.style.setProperty('--player-pulse-scale', pulseScale);
-      updateHeatMeter(safeDistance, loc.radius);
-
-      if (!state.showAllStops) {
-        if (safeDistance <= loc.radius) {
-          if (!state.adminVisible) proximityNote.textContent = `✨ ${loc.name} is under your feet. Tap Open.`;
-          updateUnlockTray(loc, safeDistance);
-          queueProximityBeep(260);
-        } else if (safeDistance <= detectionEdge) {
-          if (!state.adminVisible) proximityNote.textContent = `Getting warmer: ${Math.round(safeDistance)}m to the next hidden stop.`;
-          updateUnlockTray(null, null);
-          const interval = Math.round(1100 - (ratio * 850));
-          queueProximityBeep(interval);
+        if (!userMarker) {
+          userMarker = L.marker(userLatLng, { icon: makeGpsIcon(false) }).addTo(map);
+          accuracyCircle = L.circle(userLatLng, { radius: accuracy, stroke: true, weight: 1, opacity: .5, fillOpacity: .08 }).addTo(map);
         } else {
-          if (!state.adminVisible) proximityNote.textContent = `Next hidden stop: ${Math.round(safeDistance)}m away.`;
-          updateUnlockTray(null, null);
-          stopProximityBeep();
+          userMarker.setLatLng(userLatLng);
+          accuracyCircle.setLatLng(userLatLng);
+          accuracyCircle.setRadius(accuracy);
         }
-      } else {
-        if (!state.adminVisible) proximityNote.textContent = `${loc.name}: ${Math.round(safeDistance)}m away.`;
-        updateUnlockTray(loc, safeDistance);
-        stopProximityBeep();
-      }
-    }
-
-
-    function formatElapsedTime(startIso) {
-      if (!startIso) return '0:00';
-      const totalSeconds = Math.max(0, Math.floor((Date.now() - new Date(startIso).getTime()) / 1000));
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      return `${minutes}:${String(seconds).padStart(2, '0')}`;
-    }
-
-    function updateHeatMeter(distance, radius) {
-      const bar = document.getElementById('heatBar');
-      const label = document.getElementById('heatLabel');
-      if (!bar || !label) return;
-      if (!Number.isFinite(distance) || !Number.isFinite(radius)) {
-        bar.style.width = '0%';
-        label.textContent = 'Searching…';
-        return;
-      }
-      const maxDistance = Math.max(radius * 3, 65);
-      const percent = Math.max(0, Math.min(1, 1 - (distance / maxDistance)));
-      bar.style.width = `${Math.round(percent * 100)}%`;
-      if (distance <= radius) label.textContent = 'HOT';
-      else if (distance <= radius * 1.5) label.textContent = 'Warm';
-      else if (distance <= radius * 2.2) label.textContent = 'Cool';
-      else label.textContent = 'Cold';
-    }
-
-    function getZoneSoundProfile(zone = '') {
-      const z = String(zone).toLowerCase();
-      if (z.includes('forest')) return { root: 220, accent: 277.18, wave: 'sine' };
-      if (z.includes('playground')) return { root: 523.25, accent: 659.25, wave: 'square' };
-      if (z.includes('final')) return { root: 783.99, accent: 987.77, wave: 'triangle' };
-      if (z.includes('golden')) return { root: 392.0, accent: 523.25, wave: 'triangle' };
-      return { root: 329.63, accent: 440.0, wave: 'sine' };
-    }
-
-    function playZoneSound(zone) {
-      if (!state.musicEnabled) return;
-      const profile = getZoneSoundProfile(zone);
-      playTone(profile.root, 0.13, 0.025, profile.wave, 0);
-      playTone(profile.accent, 0.16, 0.02, profile.wave, 0.08);
-    }
-
-    function maybePlayZoneSound(zone) {
-      if (!zone) return;
-      if (state.lastZone === zone) return;
-      state.lastZone = zone;
-      playZoneSound(zone);
-    }
-
-    function startRadarPulse() {
-      if (state.radarPulse) return;
-      let pulseRadius = 5;
-      let direction = 1;
-      state.radarPulse = setInterval(() => {
-        if (!state.radarCircle) return;
-        pulseRadius += direction * 1.4;
-        if (pulseRadius >= 18) direction = -1;
-        if (pulseRadius <= 5) direction = 1;
-        state.radarCircle.setRadius(pulseRadius);
-      }, 120);
-    }
-
-    function showWinScreen() {
-      if (state.winShown) return;
-      state.winShown = true;
-      document.getElementById('winEggs').textContent = `${state.found.size}/${LOCATIONS.length}`;
-      document.getElementById('winTime').textContent = formatElapsedTime(state.startedAt);
-      document.getElementById('winScore').textContent = '100%';
-      document.getElementById('winMessage').textContent = `Amazing job, ${state.playerName}! You completed the whole Easter hunt.`;
-      document.getElementById('winScreen').style.display = 'flex';
-    }
-
-    function updateStats() {
-      document.getElementById('foundCount').textContent = state.found.size;
-      document.getElementById('totalCount').textContent = LOCATIONS.length;
-      document.getElementById('zoneStatus').textContent = state.inZone ? 'IN' : 'OUT';
-      const next = nextUnfoundLocation();
-      if (next && state.userLatLng) {
-        document.getElementById('distanceInfo').textContent = formatMeters(distanceMeters(state.userLatLng.lat, state.userLatLng.lng, next.lat, next.lng));
-      } else if (next) {
-        document.getElementById('distanceInfo').textContent = next.name;
-      } else {
-        document.getElementById('distanceInfo').textContent = 'Done';
-      }
-    }
-
-    function buildPopupHtml(loc) {
-      return `
-        <div class="popup-content">
-          <h3>${loc.icon} ${loc.name}</h3>
-          <p><strong>Zone:</strong> ${loc.zone}</p>
-          <p>${loc.challenge}</p>
-          <p><em>Reward:</em> ${loc.reward}</p>
-          <div class="popup-actions">
-            <button class="location-btn" onclick="window.handleLocationAction(${loc.id})">${state.found.has(loc.id) ? '✅ Already Found' : 'Open Challenge'}</button>
-          </div>
-          ${state.userLatLng ? `<div class="proximity-note">${Math.round(distanceMeters(state.userLatLng.lat, state.userLatLng.lng, loc.lat, loc.lng))}m away</div>` : ''}
-        </div>
-      `;
-    }
-
-    let markers = [];
-
-    function createMarkerForLocation(loc) {
-      const marker = L.marker([loc.lat, loc.lng], { icon: getEggIcon(loc.icon), draggable: state.editMode });
-      marker.bindPopup(buildPopupHtml(loc));
-      marker.on('click', () => {
-        if (state.editMode && state.adminVisible) openEditor(loc.id);
-      });
-      marker.on('dragend', e => {
-        const latlng = e.target.getLatLng();
-        loc.lat = Number(latlng.lat.toFixed(6));
-        loc.lng = Number(latlng.lng.toFixed(6));
-        if (state.selectedStopId === loc.id) populateEditor(loc.id);
-        renderQuestPanel();
-        updateStats();
-        refreshPopups();
-      });
-      if (state.showAllStops) marker.addTo(map);
-      return { ...loc, marker };
-    }
-
-    function rebuildMarkers() {
-      markers.forEach(m => {
-        if (m.marker && map.hasLayer(m.marker)) map.removeLayer(m.marker);
-      });
-      markers = LOCATIONS.map(loc => createMarkerForLocation(loc));
-      setStopsVisibility(state.showAllStops);
-      const compactBtn = document.getElementById('compactQuestBtn');
-      if (compactBtn) compactBtn.addEventListener('click', toggleQuestPanel);
-      refreshPopups();
-    }
-
-    function bringGameLayersToFront() {
-      if (overlayEnabled && imageOverlay && map.hasLayer(imageOverlay)) imageOverlay.bringToFront();
-      markers.forEach(m => { if (map.hasLayer(m.marker)) m.marker.bringToFront(); });
-      if (state.accuracyCircle && map.hasLayer(state.accuracyCircle)) state.accuracyCircle.bringToBack();
-      if (state.radarCircle && map.hasLayer(state.radarCircle)) state.radarCircle.bringToBack();
-      if (state.userMarker && map.hasLayer(state.userMarker)) state.userMarker.bringToFront();
-    }
-
-    function refreshPopups() {
-      markers.forEach(m => {
-        m.marker.setPopupContent(buildPopupHtml(m));
-        m.marker.setIcon(getEggIcon(m.icon));
-        if (m.marker.dragging) {
-          if (state.editMode && state.adminVisible) m.marker.dragging.enable();
-          else m.marker.dragging.disable();
-        }
-      });
-      bringGameLayersToFront();
-    }
-
-    function getMarkerRecordById(id) {
-      return markers.find(m => m.id === id) || null;
-    }
-
-    function normalizeImportedLocations(data) {
-      if (!Array.isArray(data)) throw new Error('Imported file must contain an array of stops.');
-      return data.map((item, index) => ({
-        id: Number(item.id) || index + 1,
-        name: String(item.name || `Stop ${index + 1}`),
-        lat: Number(item.lat),
-        lng: Number(item.lng),
-        zone: String(item.zone || 'Custom Zone'),
-        icon: String(item.icon || '🥚'),
-        type: String(item.type || 'direction'),
-        challenge: String(item.challenge || 'Add your challenge here.'),
-        clue: String(item.clue || 'Add your clue here.'),
-        reward: String(item.reward || 'New Egg'),
-        radius: Number(item.radius) || 20,
-        answer: item.answer != null ? String(item.answer) : ''
-      })).filter(item => Number.isFinite(item.lat) && Number.isFinite(item.lng));
-    }
-
-    function importStopsFromData(data) {
-      const normalized = normalizeImportedLocations(data);
-      if (!normalized.length) throw new Error('No valid stops were found in the imported file.');
-      LOCATIONS.length = 0;
-      normalized.forEach((loc, index) => {
-        loc.id = index + 1;
-        LOCATIONS.push(loc);
-      });
-      state.selectedStopId = null;
-      document.getElementById('editorPanel').style.display = 'none';
-      rebuildMarkers();
-      renderQuestPanel();
-      updateStats();
-    }
-
-    function openEditor(id) {
-      if (!state.adminVisible) return;
-      state.selectedStopId = id;
-      document.getElementById('editorPanel').style.display = 'block';
-      populateEditor(id);
-    }
-
-    function populateEditor(id) {
-      const stop = getMarkerRecordById(id);
-      if (!stop) return;
-      document.getElementById('editorStopId').textContent = `Editing Stop #${stop.id}`;
-      document.getElementById('editName').value = stop.name || '';
-      document.getElementById('editZone').value = stop.zone || '';
-      document.getElementById('editReward').value = stop.reward || '';
-      document.getElementById('editRadius').value = stop.radius || 20;
-      document.getElementById('editClue').value = stop.clue || '';
-      document.getElementById('editChallenge').value = stop.challenge || '';
-      document.getElementById('editCoords').textContent = `Lat: ${stop.lat} | Lng: ${stop.lng}`;
-    }
-
-    function syncLocationRecord(id) {
-      const markerRecord = getMarkerRecordById(id);
-      const baseRecord = LOCATIONS.find(l => l.id === id);
-      if (!markerRecord || !baseRecord) return;
-      Object.assign(baseRecord, {
-        name: markerRecord.name,
-        zone: markerRecord.zone,
-        reward: markerRecord.reward,
-        radius: markerRecord.radius,
-        clue: markerRecord.clue,
-        challenge: markerRecord.challenge,
-        lat: markerRecord.lat,
-        lng: markerRecord.lng,
-        answer: markerRecord.answer || ''
-      });
-    }
-
-    function renumberStops() {
-      LOCATIONS.forEach((loc, index) => { loc.id = index + 1; });
-      markers.forEach((m, index) => { m.id = index + 1; });
-    }
-
-    function setStopsVisibility(show) {
-      state.showAllStops = show;
-      markers.forEach(m => {
-        const isOnMap = map.hasLayer(m.marker);
-        if (show && !isOnMap) m.marker.addTo(map);
-        if (!show && isOnMap) map.removeLayer(m.marker);
-      });
-      document.getElementById('showAllBtn').textContent = state.showAllStops ? '🙈 Hide Stops' : '🗺️ Show Stops';
-      persist();
-      refreshPopups();
-      updateProximityFeedback();
-    }
-
-    function setEditMode(on) {
-      state.editMode = on;
-      document.getElementById('editModeBtn').textContent = state.editMode ? '✏️ Edit Stops On' : '✏️ Edit Stops Off';
-      document.getElementById('editorPanel').style.display = state.editMode && state.selectedStopId && state.adminVisible ? 'block' : 'none';
-      refreshPopups();
-    }
-
-    function setAdminVisible(on) {
-      state.adminVisible = on;
-      document.getElementById('adminControls').style.display = on ? 'flex' : 'none';
-      document.getElementById('tapHint').textContent = on ? 'Admin menu open' : '';
-      if (!on) {
-        document.getElementById('editorPanel').style.display = 'none';
-        setEditMode(false);
-      } else if (state.selectedStopId) {
-        document.getElementById('editorPanel').style.display = 'block';
-      }
-    }
-
-    function toggleQuestPanel() {
-      state.questCollapsed = !state.questCollapsed;
-      applyUiState();
-      renderQuestPanel();
-    }
-
-    function renderQuestPanel() {
-      const panel = document.getElementById('questPanel');
-      panel.innerHTML = `
-        <div class="quest-header-row" style="margin-bottom:10px;">
-          <strong>Quest Log</strong>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span class="tag">${state.found.size}/${LOCATIONS.length} found</span>
-            <button class="icon-btn" id="compactQuestBtn" title="Collapse quest log" style="width:32px;height:32px;min-width:32px;font-size:15px;">${state.questCollapsed ? '➕' : '➖'}</button>
-          </div>
-        </div>
-      `;
-
-      if (state.questCollapsed) {
-        panel.innerHTML += `<div class="small">Tap the + button to reopen your quest list.</div>`;
-        const compactBtn = document.getElementById('compactQuestBtn');
-        if (compactBtn) compactBtn.addEventListener('click', toggleQuestPanel);
-        refreshPopups();
-        return;
-      }
-
-      LOCATIONS.forEach(loc => {
-        const found = state.found.has(loc.id);
-        let distance = '--';
-        if (state.userLatLng) distance = formatMeters(distanceMeters(state.userLatLng.lat, state.userLatLng.lng, loc.lat, loc.lng));
-        const div = document.createElement('div');
-        div.className = `quest-card ${found ? 'found' : 'locked'}`;
-        div.innerHTML = `
-          <div class="quest-title">
-            <span>${loc.icon} ${loc.name}</span>
-            <span>${found ? '✅' : distance}</span>
-          </div>
-          <div class="small">${loc.zone}</div>
-          <div style="margin-top:6px;">${found ? `<strong>Collected:</strong> ${loc.reward}` : loc.clue}</div>
-          <button style="margin-top:10px; width:100%;" onclick="window.focusLocation(${loc.id})">Open</button>
-        `;
-        panel.appendChild(div);
-      });
-      const compactBtn = document.getElementById('compactQuestBtn');
-      if (compactBtn) compactBtn.addEventListener('click', toggleQuestPanel);
-      refreshPopups();
-    }
-
-    function markFound(id) {
-      if (state.found.has(id)) return;
-      state.found.add(id);
-      playSuccessSound();
-      persist();
-      renderQuestPanel();
-      updateStats();
-      updateProximityFeedback();
-      if (state.found.size === LOCATIONS.length) {
-        launchConfetti(110);
-        playCelebrationMusic();
-        setTimeout(showWinScreen, 220);
-      }
-    }
-
-    window.focusLocation = function(id) {
-      const loc = markers.find(m => m.id === id);
-      if (!loc) return;
-      map.flyTo([loc.lat, loc.lng], 19, { duration: 0.8 });
-      setTimeout(() => loc.marker.openPopup(), 400);
-    };
-
-    window.handleLocationAction = function(id) {
-      const loc = LOCATIONS.find(l => l.id === id);
-      if (!loc) return;
-      if (!state.userLatLng) {
-        alert('Please tap “Find Me” first so the game can see how close you are to this stop.');
-        return;
-      }
-      const dist = distanceMeters(state.userLatLng.lat, state.userLatLng.lng, loc.lat, loc.lng);
-      if (!state.inZone) {
-        alert('🚫 You are outside the play zone. Return inside the Easter Realm first.');
-        return;
-      }
-      if (dist > loc.radius) {
-        alert(`You are too far away from ${loc.name}. Move closer to unlock it. Current distance: ${Math.round(dist)}m`);
-        return;
-      }
-      if (state.found.has(loc.id)) {
-        alert(`You already collected the ${loc.reward}.`);
-        return;
-      }
-      playUnlockSound();
-      runInteraction(loc);
-    };
-
-    function runInteraction(loc) {
-      switch (loc.type) {
-        case 'intro':
-          celebrateCorrectAnswer(loc.reward);
-          alert(`🐰 ${loc.challenge}\n\nClue: ${loc.clue}`);
-          markFound(loc.id);
-          break;
-        case 'riddle':
-        case 'quiz':
-        case 'scramble':
-        case 'final': {
-          const response = prompt(`${loc.challenge}\n\nType your answer:`) || '';
-          if (response.trim().toLowerCase() === String(loc.answer || '').toLowerCase()) {
-            celebrateCorrectAnswer(loc.reward);
-            alert(`Correct! You earned the ${loc.reward}.\n\nNext clue: ${loc.clue}`);
-            markFound(loc.id);
-          } else {
-            alert('Not quite. Try again when you are ready.');
-          }
-          break;
-        }
-        case 'direction':
-        case 'listen':
-        case 'trail':
-        case 'search':
-          celebrateCorrectAnswer(loc.reward);
-          alert(`${loc.challenge}\n\nNext clue: ${loc.clue}`);
-          markFound(loc.id);
-          break;
-        case 'collect': {
-          let taps = 0;
-          while (taps < 3) {
-            const ok = confirm(`🥕 Tap OK to collect carrot ${taps + 1} of 3.`);
-            if (!ok) break;
-            taps += 1;
-          }
-          if (taps >= 3) {
-            celebrateCorrectAnswer(loc.reward);
-            alert(`You gathered all 3 carrots and won the ${loc.reward}!\n\n${loc.clue}`);
-            markFound(loc.id);
-          } else {
-            alert('You need all 3 carrots to complete this stop.');
-          }
-          break;
-        }
-        case 'action': {
-          const ok = confirm(`${loc.challenge}\n\nPress OK when completed.`);
-          if (ok) {
-            celebrateCorrectAnswer(loc.reward);
-            alert(`Great job! You earned the ${loc.reward}.\n\n${loc.clue}`);
-            markFound(loc.id);
-          }
-          break;
-        }
-        case 'timer': {
-          if (state.timerRunning) return;
-          state.timerRunning = true;
-          let count = 10;
-          alert('Timer started. Stay close for 10 seconds.');
-          const interval = setInterval(() => {
-            if (!state.userLatLng) return;
-            const dist = distanceMeters(state.userLatLng.lat, state.userLatLng.lng, loc.lat, loc.lng);
-            if (dist > loc.radius + 5 || !state.inZone) {
-              clearInterval(interval);
-              state.timerRunning = false;
-              alert('You moved away too soon. Try staying in the zone for the full 10 seconds.');
-              return;
-            }
-            count -= 1;
-            if (count <= 0) {
-              clearInterval(interval);
-              state.timerRunning = false;
-              celebrateCorrectAnswer(loc.reward);
-              alert(`⏱️ Success! You stayed in the magic zone and earned the ${loc.reward}.\n\n${loc.clue}`);
-              markFound(loc.id);
-            }
-          }, 1000);
-          break;
-        }
-        case 'tap': {
-          const ok = confirm('🥚 Tap OK to catch the falling egg!');
-          if (ok) {
-            celebrateCorrectAnswer(loc.reward);
-            alert(`Caught it! You won the ${loc.reward}.\n\n${loc.clue}`);
-            markFound(loc.id);
-          }
-          break;
-        }
-        case 'speed': {
-          let count = 8;
-          alert('⚡ Speed round started. Stay at this location for 8 seconds.');
-          const interval = setInterval(() => {
-            if (!state.userLatLng) return;
-            const dist = distanceMeters(state.userLatLng.lat, state.userLatLng.lng, loc.lat, loc.lng);
-            if (dist > loc.radius + 4 || !state.inZone) {
-              clearInterval(interval);
-              alert('Too slow or too far. Try again!');
-              return;
-            }
-            count -= 1;
-            if (count <= 0) {
-              clearInterval(interval);
-              celebrateCorrectAnswer(loc.reward);
-              alert(`⚡ You beat the speed challenge and earned the ${loc.reward}!\n\n${loc.clue}`);
-              markFound(loc.id);
-            }
-          }, 1000);
-          break;
-        }
-        default:
-          markFound(loc.id);
-      }
-    }
-
-    function updateUserPosition(lat, lng, accuracy) {
-      state.userLatLng = { lat, lng };
-      if (!state.userMarker) {
-        state.userMarker = L.marker([lat, lng], { icon: getPlayerIcon(), zIndexOffset: 1000 }).addTo(map).bindPopup('You are here');
-      } else {
-        state.userMarker.setLatLng([lat, lng]);
-      }
-
-      if (!state.accuracyCircle) {
-        state.accuracyCircle = L.circle([lat, lng], {
-          radius: accuracy || 10,
-          color: '#4aa8ff',
-          fillColor: '#7fd7ff',
-          fillOpacity: 0.12,
-          weight: 1
-        }).addTo(map);
-      } else {
-        state.accuracyCircle.setLatLng([lat, lng]);
-        state.accuracyCircle.setRadius(accuracy || 10);
-      }
-
-      if (!state.radarCircle) {
-        state.radarCircle = L.circle([lat, lng], {
-          radius: 8,
-          color: '#7fd7ff',
-          fillColor: '#7fd7ff',
-          fillOpacity: 0.06,
-          weight: 2,
-          opacity: 0.55
-        }).addTo(map);
-        startRadarPulse();
-      } else {
-        state.radarCircle.setLatLng([lat, lng]);
-      }
-
-      state.inZone = pointInPolygon([lat, lng], playZoneCoords);
-      document.getElementById('warningBanner').style.display = state.inZone ? 'none' : 'block';
-      updateStats();
-      renderQuestPanel();
-      updateProximityFeedback();
-      bringGameLayersToFront();
-    }
-
-    function locateUser(fly = true) {
-      if (!navigator.geolocation) {
-        alert('Geolocation is not supported on this device/browser.');
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        pos => {
-          const { latitude, longitude, accuracy } = pos.coords;
-          updateUserPosition(latitude, longitude, accuracy);
-          if (fly) map.flyTo([latitude, longitude], 18, { duration: 0.8 });
-        },
-        err => {
-          alert(`The game started, but live location could not be read yet: ${err.message}`);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
-      );
-    }
-
-    if (navigator.geolocation) {
-      navigator.geolocation.watchPosition(
-        pos => updateUserPosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
-        () => {},
-        { enableHighAccuracy: true, maximumAge: 3000, timeout: 12000 }
-      );
-    }
-
-    function startGame() {
-      const inputEl = document.getElementById('playerNameInput');
-      const input = inputEl ? inputEl.value.trim() : '';
-      state.playerName = input || 'Adventurer';
-      if (!state.startedAt) state.startedAt = new Date().toISOString();
-      document.getElementById('playerChip').textContent = `Player: ${state.playerName}`;
-      document.getElementById('introModal').style.display = 'none';
-      ensureAudio();
-      if (state.musicEnabled) startBackgroundMusic();
-      persist();
-      applyUiState();
-      updateStats();
-      renderQuestPanel();
-      setTimeout(() => locateUser(true), 50);
-    }
-
-    function exportResults() {
-      const exportData = {
-        playerName: state.playerName,
-        startedAt: state.startedAt,
-        exportedAt: new Date().toISOString(),
-        foundCount: state.found.size,
-        totalStops: LOCATIONS.length,
-        foundStopIds: [...state.found],
-        foundStops: LOCATIONS.filter(loc => state.found.has(loc.id)).map(loc => ({
-          id: loc.id,
-          name: loc.name,
-          reward: loc.reward,
-          lat: loc.lat,
-          lng: loc.lng
-        })),
-        missedStops: LOCATIONS.filter(loc => !state.found.has(loc.id)).map(loc => ({
-          id: loc.id,
-          name: loc.name
-        }))
-      };
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'easter-hunt-results.json';
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    document.getElementById('startGameBtn').addEventListener('click', e => {
-      e.preventDefault();
-      startGame();
-    });
-
-    document.getElementById('playerNameInput').addEventListener('keydown', e => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        startGame();
-      }
-    });
-
-    document.getElementById('locateBtn').addEventListener('click', () => { ensureAudio(); locateUser(true); });
-    document.getElementById('toggleQuestBtn').addEventListener('click', toggleQuestPanel);
-    document.getElementById('musicToggleBtn').addEventListener('click', () => {
-      ensureAudio();
-      setMusicEnabled(!state.musicEnabled);
-    });
-    document.getElementById('compactTopbarBtn').addEventListener('click', () => {
-      state.compactTopbar = !state.compactTopbar;
-      applyUiState();
-    });
-
-    window.addEventListener('resize', () => {
-      if (isMobileView()) {
-        state.compactTopbar = true;
-        state.questCollapsed = true;
-      }
-      applyUiState();
-      renderQuestPanel();
-    });
-    document.getElementById('unlockNearestBtn').addEventListener('click', () => {
-      if (state.nearestUnlockId) window.handleLocationAction(state.nearestUnlockId);
-    });
-    document.getElementById('playAgainBtn').addEventListener('click', () => {
-      localStorage.removeItem(STORAGE_KEY);
-      location.reload();
-    });
-
-    document.getElementById('showAllBtn').addEventListener('click', () => setStopsVisibility(!state.showAllStops));
-
-    document.getElementById('overlayBtn').addEventListener('click', () => {
-      overlayEnabled = !overlayEnabled;
-      if (overlayEnabled) {
-        if (imageOverlay) imageOverlay.addTo(map);
-        baseTiles.setOpacity(0.35);
-        document.getElementById('overlayBtn').textContent = '🖼️ Overlay On';
-      } else {
-        if (imageOverlay && map.hasLayer(imageOverlay)) map.removeLayer(imageOverlay);
-        baseTiles.setOpacity(1);
-        document.getElementById('overlayBtn').textContent = '🖼️ Overlay Off';
-      }
-      bringGameLayersToFront();
-    });
-
-    document.getElementById('editModeBtn').addEventListener('click', () => setEditMode(!state.editMode));
-
-    document.getElementById('closeAdminBtn').addEventListener('click', () => {
-      setAdminVisible(false);
-    });
-
-    document.getElementById('resetBtn').addEventListener('click', () => {
-      if (!confirm('Reset all progress for this Easter hunt?')) return;
-      localStorage.removeItem(STORAGE_KEY);
-      location.reload();
-    });
-
-    document.getElementById('closeEditorBtn').addEventListener('click', () => {
-      document.getElementById('editorPanel').style.display = 'none';
-      state.selectedStopId = null;
-    });
-
-    document.getElementById('saveStopBtn').addEventListener('click', () => {
-      const stop = getMarkerRecordById(state.selectedStopId);
-      if (!stop) return;
-      stop.name = document.getElementById('editName').value.trim() || stop.name;
-      stop.zone = document.getElementById('editZone').value.trim() || stop.zone;
-      stop.reward = document.getElementById('editReward').value.trim() || stop.reward;
-      stop.radius = Number(document.getElementById('editRadius').value) || stop.radius;
-      stop.clue = document.getElementById('editClue').value.trim() || stop.clue;
-      stop.challenge = document.getElementById('editChallenge').value.trim() || stop.challenge;
-      syncLocationRecord(stop.id);
-      renderQuestPanel();
-      updateStats();
-      refreshPopups();
-      populateEditor(stop.id);
-      alert('Stop saved.');
-    });
-
-    document.getElementById('copyCoordsBtn').addEventListener('click', async () => {
-      const stop = getMarkerRecordById(state.selectedStopId);
-      if (!stop) return;
-      const text = `${stop.lat}, ${stop.lng}`;
-      try {
-        await navigator.clipboard.writeText(text);
-        alert('Coordinates copied.');
-      } catch {
-        alert(text);
-      }
-    });
-
-    document.getElementById('deleteStopBtn').addEventListener('click', () => {
-      const stop = getMarkerRecordById(state.selectedStopId);
-      if (!stop) return;
-      if (!confirm(`Delete ${stop.name}?`)) return;
-      if (map.hasLayer(stop.marker)) map.removeLayer(stop.marker);
-      const markerIndex = markers.findIndex(m => m.id === stop.id);
-      const locIndex = LOCATIONS.findIndex(l => l.id === stop.id);
-      if (markerIndex >= 0) markers.splice(markerIndex, 1);
-      if (locIndex >= 0) LOCATIONS.splice(locIndex, 1);
-      renumberStops();
-      state.selectedStopId = null;
-      document.getElementById('editorPanel').style.display = 'none';
-      renderQuestPanel();
-      updateStats();
-      refreshPopups();
-    });
-
-    document.getElementById('addStopAtCenterBtn').addEventListener('click', () => {
-      const center = map.getCenter();
-      const newStop = {
-        id: LOCATIONS.length + 1,
-        name: `New Stop ${LOCATIONS.length + 1}`,
-        lat: Number(center.lat.toFixed(6)),
-        lng: Number(center.lng.toFixed(6)),
-        zone: 'Custom Zone',
-        icon: '🥚',
-        type: 'direction',
-        challenge: 'Add your challenge here.',
-        clue: 'Add your clue here.',
-        reward: 'New Egg',
-        radius: 20,
-        answer: ''
-      };
-      LOCATIONS.push(newStop);
-      rebuildMarkers();
-      openEditor(newStop.id);
-      renderQuestPanel();
-      updateStats();
-    });
-
-    document.getElementById('exportStopsBtn').addEventListener('click', () => {
-      const exportData = LOCATIONS.map(loc => ({
-        id: loc.id,
-        name: loc.name,
-        lat: loc.lat,
-        lng: loc.lng,
-        zone: loc.zone,
-        icon: loc.icon,
-        type: loc.type,
-        challenge: loc.challenge,
-        clue: loc.clue,
-        reward: loc.reward,
-        radius: loc.radius,
-        answer: loc.answer || ''
-      }));
-      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'easter-hunt-stops.json';
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-
-    document.getElementById('exportResultsBtn').addEventListener('click', exportResults);
-
-    document.getElementById('importStopsBtn').addEventListener('click', () => {
-      document.getElementById('importStopsInput').click();
-    });
-
-    document.getElementById('importStopsInput').addEventListener('change', async e => {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        importStopsFromData(JSON.parse(text));
-        alert(`Imported ${LOCATIONS.length} stops successfully.`);
-      } catch (err) {
-        alert(`Import failed: ${err.message}`);
-      } finally {
-        e.target.value = '';
-      }
-    });
-
-    document.getElementById('titleTapTarget').addEventListener('click', () => {
-      state.tapUnlockCount += 1;
-      const remaining = 5 - state.tapUnlockCount;
-      if (state.tapUnlockTimer) clearTimeout(state.tapUnlockTimer);
-      state.tapUnlockTimer = setTimeout(() => {
-        state.tapUnlockCount = 0;
-        document.getElementById('tapHint').textContent = state.adminVisible ? 'Admin menu open' : '';
-      }, 1800);
-
-      if (state.tapUnlockCount >= 5) {
-        state.tapUnlockCount = 0;
-        setAdminVisible(!state.adminVisible);
-      } else if (!state.adminVisible && remaining > 0) {
-        document.getElementById('tapHint').textContent = `${remaining} more taps for admin`;
-      }
-    });
-
-    function runSelfTests() {
-      console.assert(formatMeters(null) === '--', 'formatMeters should handle null');
-      console.assert(formatMeters(25) === '25m', 'formatMeters should render meters');
-      console.assert(pointInPolygon([
-        (overlayCorners.topLeft[0] + overlayCorners.bottomRight[0]) / 2,
-        (overlayCorners.topLeft[1] + overlayCorners.bottomRight[1]) / 2
-      ], playZoneCoords) === true, 'center point should be inside derived overlay zone');
-      console.assert(pointInPolygon([43.6165, -79.5780], playZoneCoords) === false, 'known exterior point should be outside');
-      console.assert(Math.round(distanceMeters(43.617757, -79.575952, 43.617757, -79.575952)) === 0, 'distance to same point should be zero');
-      console.assert(Math.abs(overlayCorners.bottomLeft[0] - 43.613873) < 0.000001, 'bottom-left latitude should match provided coordinate');
-      console.assert(Math.abs(overlayCorners.bottomLeft[1] - (-79.575751)) < 0.000001, 'bottom-left longitude should match provided coordinate');
-      console.assert(LOCATIONS.length === 15, 'hard-coded stops should load 15 entries');
-      console.assert(LOCATIONS[0].lat === 43.616701, 'hard-coded Bunny HQ should match uploaded json');
-      setStopsVisibility(false);
-      console.assert(markers.every(m => !map.hasLayer(m.marker)), 'all markers should hide when stop visibility is false');
-      setStopsVisibility(true);
-      console.assert(markers.every(m => map.hasLayer(m.marker)), 'all markers should show when stop visibility is true');
-      setEditMode(true);
-      console.assert(state.editMode === true, 'edit mode should turn on');
-      setEditMode(false);
-      console.assert(state.editMode === false, 'edit mode should turn off');
-      const imported = normalizeImportedLocations([{ name: 'Test Stop', lat: 43.61, lng: -79.57 }]);
-      console.assert(imported.length === 1, 'import normalization should keep valid stops');
-      console.assert(imported[0].radius === 20, 'import normalization should set default radius');
-      setAdminVisible(true);
-      console.assert(state.adminVisible === true, 'admin menu should open');
-      setAdminVisible(false);
-      console.assert(state.adminVisible === false, 'admin menu should close');
-      toggleQuestPanel();
-      console.assert(state.questCollapsed === true, 'quest panel should collapse');
-      toggleQuestPanel();
-      console.assert(state.questCollapsed === false, 'quest panel should expand');
-    }
-
-    rebuildMarkers();
-    applyUiState();
-    renderQuestPanel();
-    updateStats();
-    baseTiles.setOpacity(overlayEnabled ? 0.35 : 1);
-    setAdminVisible(false);
-    bringGameLayersToFront();
-    if (saved.playerName && state.musicEnabled) {
-      setTimeout(() => { ensureAudio(); startBackgroundMusic(); }, 400);
-    }
-    runSelfTests();
-    function setOverlayStatus(message) {
-      const el = document.getElementById('overlayStatus');
-      if (!el) return;
-      el.style.display = 'block';
-      el.textContent = message;
-      clearTimeout(setOverlayStatus._timer);
-      setOverlayStatus._timer = setTimeout(() => {
-        el.style.display = 'none';
-      }, 2500);
-    }
-
-    const overlayEditBtn = document.getElementById('overlayEditBtn');
-    const saveOverlayBtn = document.getElementById('saveOverlayBtn');
-    const exportOverlayBtn = document.getElementById('exportOverlayBtn');
-    const importOverlayBtn = document.getElementById('importOverlayBtn');
-    const importOverlayInput = document.getElementById('importOverlayInput');
-    const resetOverlayBtn = document.getElementById('resetOverlayBtn');
-    const overlayEditTip = document.getElementById('overlayEditTip');
-
-    if (overlayEditBtn) {
-      overlayEditBtn.onclick = () => {
-        overlayEditMode = !overlayEditMode;
-        overlayEditBtn.textContent = overlayEditMode ? '📐 Edit Overlay On' : '📐 Edit Overlay Off';
-        overlayEditTip.style.display = overlayEditMode ? 'block' : 'none';
-        if (overlayEditMode) {
-          addOverlayHandles();
-          setOverlayStatus('Overlay edit mode is on.');
-        } else {
-          clearOverlayHandles();
-          saveOverlayState();
-          setOverlayStatus('Overlay edit mode is off.');
-        }
-      };
-    }
-
-    if (saveOverlayBtn) {
-      saveOverlayBtn.onclick = () => {
-        saveOverlayState();
-        setOverlayStatus('Overlay saved on this device.');
-      };
-    }
-
-    if (exportOverlayBtn) {
-      exportOverlayBtn.onclick = async () => {
-        await exportOverlayJson();
-        setOverlayStatus('Overlay JSON downloaded.');
-      };
-    }
-
-    if (importOverlayBtn && importOverlayInput) {
-      importOverlayBtn.onclick = () => {
-        importOverlayInput.click();
-      };
-      importOverlayInput.onchange = async (e) => {
-        const file = e.target.files && e.target.files[0];
-        const ok = await importOverlayJsonFile(file);
-        if (ok) setOverlayStatus('Overlay JSON loaded.');
-        importOverlayInput.value = '';
-      };
-    }
-
-    if (resetOverlayBtn) {
-      resetOverlayBtn.onclick = () => {
-        resetOverlayState();
-        if (overlayEditMode) addOverlayHandles();
-        setOverlayStatus('Overlay reset to original position.');
-      };
-    }
-
-  </script>
+        updateProximity();
+      },
+      err => { document.getElementById('statusText').textContent = 'GPS error: ' + err.message; },
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+    );
+  } else {
+    document.getElementById('statusText').textContent = 'Geolocation is not supported on this device.';
+  }
+}
+
+document.getElementById('captureBtn').addEventListener('click', () => { startMusicOnce(); captureNearestEgg(); });
+document.getElementById('musicBtn').addEventListener('click', toggleMusic);
+document.addEventListener('click', startMusicOnce, { once: true, passive: true });
+document.addEventListener('touchstart', startMusicOnce, { once: true, passive: true });
+document.getElementById('centerBtn').addEventListener('click', () => { if (userLatLng) map.setView(userLatLng, 19); });
+document.getElementById('changePlayerBtn').addEventListener('click', () => { askPlayerName(); renderEggs(); updateProximity(); });
+document.getElementById('resetPlayerBtn').addEventListener('click', resetCurrentPlayerCaptures);
+
+document.getElementById('title').addEventListener('click', () => {
+  titleTapCount++;
+  clearTimeout(titleTapTimer);
+  if (titleTapCount >= 5){
+    const panel = document.getElementById('adminPanel');
+    panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+    titleTapCount = 0;
+    return;
+  }
+  titleTapTimer = setTimeout(() => titleTapCount = 0, 1400);
+});
+
+document.getElementById('closeAdminBtn').addEventListener('click', () => { document.getElementById('adminPanel').style.display = 'none'; });
+document.getElementById('toggleHideBtn').addEventListener('click', function(){ hiddenEggs = !hiddenEggs; this.textContent = `Hide Eggs: ${hiddenEggs ? 'ON' : 'OFF'}`; renderEggs(); updateProximity(); });
+document.getElementById('toggleAddModeBtn').addEventListener('click', function(){ addMode = !addMode; this.textContent = `Add Mode: ${addMode ? 'ON' : 'OFF'}`; });
+document.getElementById('reloadJsonBtn').addEventListener('click', async () => { await loadEggsFromFile(); alert('Reloaded eggs.json if available.'); });
+document.getElementById('clearEggsBtn').addEventListener('click', () => { if (!confirm('Clear all eggs?')) return; eggsData = []; refreshEggTextarea(); renderEggs(); updateProximity(); });
+document.getElementById('applyJsonBtn').addEventListener('click', () => {
+  try {
+    const parsed = JSON.parse(document.getElementById('eggJson').value);
+    validateEggArray(parsed);
+    eggsData = parsed;
+    renderEggs();
+    updateProximity();
+    alert('JSON applied in the page. Use Download JSON to save a new eggs.json file.');
+  } catch (e) {
+    alert('Invalid JSON: ' + e.message);
+  }
+});
+document.getElementById('downloadJsonBtn').addEventListener('click', downloadEggJson);
+
+(async function start(){
+  askPlayerName();
+  await loadEggsFromFile();
+  initMap();
+})();
+</script>
 </body>
 </html>
