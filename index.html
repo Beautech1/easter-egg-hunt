@@ -75,7 +75,7 @@
 <div id="app">
   <div id="topBar">
     <div id="title">🥚 Easter Egg Hunt 🐇</div>
-    <div id="subTitle">Tap title 5 times for admin • tap anywhere to start music</div>
+    <div id="subTitle">Tap title 5 times for admin • built-in music is on</div>
     <div id="infoBar">
       <div class="pill">Player: <span id="playerNameText">Guest</span></div>
       <div class="pill">Score: <span id="scoreText">0</span></div>
@@ -91,8 +91,6 @@
       <button id="captureBtn" disabled>Capture Egg</button>
       <button class="btn" id="centerBtn">Center Me</button>
       <button class="btn" id="changePlayerBtn">Change Player</button>
-      <button class="btn" id="resetPlayerBtn">Reset My Captures</button>
-      <button class="btn" id="musicBtn">Music: ON</button>
     </div>
   </div>
 
@@ -103,10 +101,12 @@
       <button class="btn" id="toggleHideBtn">Hide Eggs: OFF</button>
       <button class="btn" id="toggleAddModeBtn">Add Mode: OFF</button>
       <button class="btn" id="reloadJsonBtn">Reload File</button>
+      <button class="btn" id="musicBtn">Music: ON</button>
       <button class="btn" id="closeAdminBtn">Close</button>
     </div>
     <div class="btnRow">
       <button class="btn" id="clearEggsBtn">Clear All Eggs</button>
+      <button class="btn" id="resetPlayerBtn">Reset My Captures</button>
       <button class="btn" id="applyJsonBtn">Apply JSON</button>
       <button class="btn" id="downloadJsonBtn">Download JSON</button>
     </div>
@@ -123,23 +123,17 @@
     </div>
   </div>
 
-  <audio id="bgMusic" loop preload="auto">
-    <source src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8d6f99c0f.mp3?filename=fun-kids-loop-112785.mp3" type="audio/mpeg">
-  </audio>
-  <audio id="captureSound" preload="auto">
-    <source src="https://cdn.pixabay.com/download/audio/2022/03/10/audio_c5d1656c66.mp3?filename=success-fanfare-trumpets-6185.mp3" type="audio/mpeg">
-  </audio>
-  <audio id="sparkleSound" preload="auto">
-    <source src="https://cdn.pixabay.com/download/audio/2022/03/24/audio_7d7a6cf2c1.mp3?filename=magical-transition-124008.mp3" type="audio/mpeg">
-  </audio>
+  <audio id="bgMusic" loop preload="auto"></audio>
+  <audio id="captureSound" preload="auto"></audio>
+  <audio id="sparkleSound" preload="auto"></audio>
 </div>
 <script>
-const CAPTURE_DISTANCE_METERS = 15;
+const CAPTURE_DISTANCE_METERS = 1;
 const JSON_FILE = 'eggs.json';
 const DEFAULT_CENTER = [43.6165, -79.5728];
 const DEFAULT_ZOOM = 18;
 const DEFAULT_EGGS = [
-{
+  {
     "id": "egg1",
     "lat": 43.614784,
     "lng": -79.572773
@@ -228,6 +222,7 @@ let hiddenEggs = false;
 let addMode = false;
 let map, userMarker, accuracyCircle;
 let musicStarted = false;
+let audioCtx = null;
 let userLatLng = null;
 let eggMarkers = [];
 let nearestAvailableEgg = null;
@@ -371,29 +366,84 @@ function captureNearestEgg(){
   showCelebration();
 }
 
+function ensureAudioContext(){
+  if (!audioCtx) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (Ctx) audioCtx = new Ctx();
+  }
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
+}
+
+function playTone(freq, duration, type = 'sine', volume = 0.05, delay = 0){
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime + delay;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, now);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(volume, now + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + duration + 0.02);
+}
+
+function startBackgroundTune(){
+  if (!audioCtx || window._bgLoopStarted) return;
+  window._bgLoopStarted = true;
+  document.getElementById('bgMusic').dataset.muted = 'false';
+  const pattern = [523.25, 659.25, 783.99, 659.25, 587.33, 698.46, 783.99, 698.46];
+  let step = 0;
+  window._bgLoopTimer = setInterval(() => {
+    if (!audioCtx || document.getElementById('bgMusic').dataset.muted === 'true') return;
+    const f = pattern[step % pattern.length];
+    playTone(f, 0.22, 'triangle', 0.018, 0);
+    playTone(f / 2, 0.24, 'sine', 0.01, 0);
+    step++;
+  }, 320);
+}
+
+function stopBackgroundTune(){
+  window._bgLoopStarted = false;
+  if (window._bgLoopTimer) {
+    clearInterval(window._bgLoopTimer);
+    window._bgLoopTimer = null;
+  }
+}
+
 function playCaptureEffects(){
-  const captureSound = document.getElementById('captureSound');
-  const sparkleSound = document.getElementById('sparkleSound');
-  try {
-    captureSound.currentTime = 0;
-    captureSound.play().catch(() => {});
-  } catch {}
-  setTimeout(() => {
-    try {
-      sparkleSound.currentTime = 0;
-      sparkleSound.play().catch(() => {});
-    } catch {}
-  }, 180);
+  ensureAudioContext();
+  const notes = [523.25, 659.25, 783.99, 1046.5];
+  notes.forEach((n, i) => playTone(n, 0.22, 'triangle', 0.08, i * 0.1));
+  [1567.98, 1318.51, 1760].forEach((n, i) => playTone(n, 0.18, 'square', 0.03, 0.12 + i * 0.08));
 }
 
 function startMusicOnce(){
+  ensureAudioContext();
   if (musicStarted) return;
+  musicStarted = true;
+  document.getElementById('bgMusic').dataset.muted = 'false';
+  startBackgroundTune();
+  document.getElementById('musicBtn').textContent = 'Music: ON';
+}
+
+function toggleMusic(){
+  ensureAudioContext();
   const bgMusic = document.getElementById('bgMusic');
-  bgMusic.volume = 0.35;
-  bgMusic.play().then(() => {
+  const isMuted = bgMusic.dataset.muted === 'true';
+  if (isMuted || !musicStarted){
     musicStarted = true;
+    bgMusic.dataset.muted = 'false';
+    startBackgroundTune();
     document.getElementById('musicBtn').textContent = 'Music: ON';
-  }).catch(() => {});
+  } else {
+    bgMusic.dataset.muted = 'true';
+    stopBackgroundTune();
+    document.getElementById('musicBtn').textContent = 'Music: OFF';
+  }
 }
 
 function toggleMusic(){
@@ -492,7 +542,8 @@ function resetCurrentPlayerCaptures(){
 function initMap(){
   map = L.map('map').setView(DEFAULT_CENTER, DEFAULT_ZOOM);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 22,
+    maxZoom: 21,
+    maxNativeZoom: 19,
     attribution: '&copy; OpenStreetMap'
   }).addTo(map);
 
@@ -534,7 +585,7 @@ function initMap(){
 }
 
 document.getElementById('captureBtn').addEventListener('click', () => { startMusicOnce(); captureNearestEgg(); });
-document.getElementById('musicBtn').addEventListener('click', toggleMusic);
+document.getElementById('musicBtn').addEventListener('click', (e) => { e.stopPropagation(); toggleMusic(); });
 document.addEventListener('click', startMusicOnce, { once: true, passive: true });
 document.addEventListener('touchstart', startMusicOnce, { once: true, passive: true });
 document.getElementById('centerBtn').addEventListener('click', () => { if (userLatLng) map.setView(userLatLng, 19); });
