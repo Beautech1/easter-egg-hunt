@@ -550,7 +550,6 @@
     </div>
     <div class="small">Walk inside the play zone, discover hidden places, solve clues, and collect 15 magical eggs.</div>
     <div class="tap-hint" id="tapHint"> </div>
-    <div class="overlay-edit-tip" id="overlayEditTip" style="display:none;">Pink dots resize the overlay. Blue dot moves the whole overlay. Changes save on this device.</div>
     <div class="overlay-edit-tip" id="overlayStatus" style="display:none;"></div>
     <div class="player-chip" id="playerChip">Player: Adventurer</div>
     <div class="heat-wrap">
@@ -578,12 +577,6 @@
       <button class="ghost" id="closeAdminBtn">✖ Close Admin</button>
       <button class="secondary" id="showAllBtn">🙈 Hide Stops</button>
       <button class="secondary" id="overlayBtn">🖼️ Overlay On</button>
-      <button class="secondary" id="overlayEditBtn">📐 Edit Overlay Off</button>
-      <button class="ghost" id="saveOverlayBtn">💾 Save Overlay</button>
-      <button class="ghost" id="exportOverlayBtn">📤 Export Overlay JSON</button>
-      <button class="ghost" id="importOverlayBtn">📥 Import Overlay JSON</button>
-      <input id="importOverlayInput" type="file" accept="application/json,.json" style="display:none;" />
-      <button class="ghost" id="resetOverlayBtn">↺ Reset Overlay</button>
       <button class="secondary" id="editModeBtn">✏️ Edit Stops Off</button>
       <button class="ghost" id="exportStopsBtn">💾 Export Stops</button>
       <button class="ghost" id="importStopsBtn">📂 Import Stops</button>
@@ -664,189 +657,42 @@
     }).addTo(map);
 
     const OVERLAY_IMAGE = 'play-zone.png';
-    const topLeft = [43.617757, -79.575952];
-    const topRight = [43.617914, -79.570055];
-    const bottomLeft = [43.613873, -79.575751];
 
-    const OVERLAY_STORAGE_KEY = 'easter_realm_overlay_v1';
-    const savedOverlay = JSON.parse(localStorage.getItem(OVERLAY_STORAGE_KEY) || 'null');
+    // HARD-CODED PRECISE OVERLAY BOUNDS (NO ROTATION)
+    const OVERLAY_NORTH = 43.617318;
+    const OVERLAY_EAST = -79.570958;
+    const OVERLAY_SOUTH = 43.614356;
+    const OVERLAY_WEST = -79.574962;
 
+    const overlayBounds = [
+      [OVERLAY_NORTH, OVERLAY_WEST],
+      [OVERLAY_SOUTH, OVERLAY_EAST]
+    ];
 
-    function deriveOverlayCorners(topLeftPoint, topRightPoint, bottomLeftPoint) {
-      const [lat1, lng1] = topLeftPoint;
-      const [lat2, lng2] = topRightPoint;
-      const [lat3, lng3] = bottomLeftPoint;
-      return {
-        topLeft: [lat1, lng1],
-        topRight: [lat2, lng2],
-        bottomLeft: [lat3, lng3],
-        bottomRight: [lat3 + (lat2 - lat1), lng3 + (lng2 - lng1)]
-      };
-    }
-
-    let overlayCorners = savedOverlay || deriveOverlayCorners(topLeft, topRight, bottomLeft);
+    const overlayPolygonLatLngs = [
+      [OVERLAY_NORTH, OVERLAY_WEST],
+      [OVERLAY_NORTH, OVERLAY_EAST],
+      [OVERLAY_SOUTH, OVERLAY_EAST],
+      [OVERLAY_SOUTH, OVERLAY_WEST],
+      [OVERLAY_NORTH, OVERLAY_WEST]
+    ];
 
     let imageOverlay = null;
     let overlayEnabled = true;
-    let overlayEditMode = false;
-    let overlayHandleMarkers = [];
-
-    function saveOverlayState() {
-      localStorage.setItem(OVERLAY_STORAGE_KEY, JSON.stringify(overlayCorners));
-    }
-
-    function resetOverlayState() {
-      overlayCorners = deriveOverlayCorners(topLeft, topRight, bottomLeft);
-      saveOverlayState();
-      refreshOverlay();
-    }
-
-    function getOverlayExportData() {
-      return {
-        topLeft: overlayCorners.topLeft,
-        topRight: overlayCorners.topRight,
-        bottomLeft: overlayCorners.bottomLeft
-      };
-    }
-
-    async function exportOverlayJson() {
-      const payload = JSON.stringify(getOverlayExportData(), null, 2);
-      const fileName = 'easter_overlay_position.json';
-      const blob = new Blob([payload], { type: 'application/json' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-      return true;
-    }
-
-    function applyOverlayImportData(data) {
-      if (!data || !Array.isArray(data.topLeft) || !Array.isArray(data.topRight) || !Array.isArray(data.bottomLeft)) {
-        throw new Error('Invalid overlay JSON format.');
-      }
-
-      overlayCorners = {
-        topLeft: [Number(data.topLeft[0]), Number(data.topLeft[1])],
-        topRight: [Number(data.topRight[0]), Number(data.topRight[1])],
-        bottomLeft: [Number(data.bottomLeft[0]), Number(data.bottomLeft[1])]
-      };
-
-      saveOverlayState();
-      refreshOverlay();
-    }
-
-    async function importOverlayJsonFile(file) {
-      if (!file) return false;
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        applyOverlayImportData(data);
-        return true;
-      } catch (err) {
-        console.error('Import overlay failed:', err);
-        alert('That overlay JSON file could not be loaded.');
-        return false;
-      }
-    }
-
-    function clearOverlayHandles() {
-      overlayHandleMarkers.forEach(marker => map.removeLayer(marker));
-      overlayHandleMarkers = [];
-    }
 
     function buildOverlayBounds() {
-      return L.latLngBounds([
-        overlayCorners.topLeft,
-        overlayCorners.topRight,
-        overlayCorners.bottomRight,
-        overlayCorners.bottomLeft
-      ]);
-    }
-
-    function createHandle(latlng, kind, onDrag) {
-      const marker = L.marker(latlng, {
-        draggable: true,
-        keyboard: false,
-        zIndexOffset: 2000,
-        icon: L.divIcon({
-          className: '',
-          html: `<div class="overlay-handle ${kind}"></div>`,
-          iconSize: kind === 'center' ? [22, 22] : [20, 20],
-          iconAnchor: kind === 'center' ? [11, 11] : [10, 10]
-        })
-      }).addTo(map);
-      marker.on('drag', onDrag);
-      marker.on('dragend', () => {
-        saveOverlayState();
-        refreshOverlay();
-      });
-      overlayHandleMarkers.push(marker);
-      return marker;
-    }
-
-    function addOverlayHandles() {
-      if (!overlayEditMode) return;
-      clearOverlayHandles();
-
-      createHandle(overlayCorners.topLeft, 'corner', (e) => {
-        overlayCorners.topLeft = [e.latlng.lat, e.latlng.lng];
-        overlayCorners.bottomRight = [overlayCorners.bottomLeft[0] + (overlayCorners.topRight[0] - overlayCorners.topLeft[0]), overlayCorners.bottomLeft[1] + (overlayCorners.topRight[1] - overlayCorners.topLeft[1])];
-        refreshOverlay(false);
-      });
-
-      createHandle(overlayCorners.topRight, 'corner', (e) => {
-        overlayCorners.topRight = [e.latlng.lat, e.latlng.lng];
-        overlayCorners.bottomRight = [overlayCorners.bottomLeft[0] + (overlayCorners.topRight[0] - overlayCorners.topLeft[0]), overlayCorners.bottomLeft[1] + (overlayCorners.topRight[1] - overlayCorners.topLeft[1])];
-        refreshOverlay(false);
-      });
-
-      createHandle(overlayCorners.bottomLeft, 'corner', (e) => {
-        overlayCorners.bottomLeft = [e.latlng.lat, e.latlng.lng];
-        overlayCorners.bottomRight = [overlayCorners.bottomLeft[0] + (overlayCorners.topRight[0] - overlayCorners.topLeft[0]), overlayCorners.bottomLeft[1] + (overlayCorners.topRight[1] - overlayCorners.topLeft[1])];
-        refreshOverlay(false);
-      });
-
-      const center = [
-        (overlayCorners.topLeft[0] + overlayCorners.topRight[0] + overlayCorners.bottomLeft[0] + overlayCorners.bottomRight[0]) / 4,
-        (overlayCorners.topLeft[1] + overlayCorners.topRight[1] + overlayCorners.bottomLeft[1] + overlayCorners.bottomRight[1]) / 4
-      ];
-
-      createHandle(center, 'center', (e) => {
-        const nextCenter = [e.latlng.lat, e.latlng.lng];
-        const latDiff = nextCenter[0] - center[0];
-        const lngDiff = nextCenter[1] - center[1];
-        overlayCorners = {
-          topLeft: [overlayCorners.topLeft[0] + latDiff, overlayCorners.topLeft[1] + lngDiff],
-          topRight: [overlayCorners.topRight[0] + latDiff, overlayCorners.topRight[1] + lngDiff],
-          bottomLeft: [overlayCorners.bottomLeft[0] + latDiff, overlayCorners.bottomLeft[1] + lngDiff],
-          bottomRight: [overlayCorners.bottomRight[0] + latDiff, overlayCorners.bottomRight[1] + lngDiff]
-        };
-        refreshOverlay(false);
-      });
+      return L.latLngBounds(overlayBounds);
     }
 
     function createImageOverlay() {
-      if (imageOverlay) map.removeLayer(imageOverlay);
-
-      if (L.imageOverlay && typeof L.imageOverlay.rotated === 'function') {
-        imageOverlay = L.imageOverlay.rotated(
-          OVERLAY_IMAGE,
-          overlayCorners.topLeft,
-          overlayCorners.topRight,
-          overlayCorners.bottomLeft,
-          { opacity: 0.96, interactive: false }
-        );
-      } else {
-        const lats = [overlayCorners.topLeft[0], overlayCorners.topRight[0], overlayCorners.bottomRight[0], overlayCorners.bottomLeft[0]];
-        const lngs = [overlayCorners.topLeft[1], overlayCorners.topRight[1], overlayCorners.bottomRight[1], overlayCorners.bottomLeft[1]];
-        imageOverlay = L.imageOverlay(OVERLAY_IMAGE, [
-          [Math.min(...lats), Math.min(...lngs)],
-          [Math.max(...lats), Math.max(...lngs)]
-        ], { opacity: 0.96, interactive: false });
+      if (imageOverlay && map.hasLayer(imageOverlay)) {
+        map.removeLayer(imageOverlay);
       }
+
+      imageOverlay = L.imageOverlay(OVERLAY_IMAGE, overlayBounds, {
+        opacity: 0.96,
+        interactive: false
+      });
 
       imageOverlay.on('error', () => {
         overlayEnabled = false;
@@ -859,29 +705,10 @@
       return imageOverlay;
     }
 
-    function refreshOverlay(updateHandles = true) {
-      overlayCorners.bottomRight = [overlayCorners.bottomLeft[0] + (overlayCorners.topRight[0] - overlayCorners.topLeft[0]), overlayCorners.bottomLeft[1] + (overlayCorners.topRight[1] - overlayCorners.topLeft[1])];
-      createImageOverlay();
-      if (playZone) {
-        playZone.setLatLngs([
-          overlayCorners.topLeft,
-          overlayCorners.topRight,
-          overlayCorners.bottomRight,
-          overlayCorners.bottomLeft
-        ]);
-      }
-      if (updateHandles) addOverlayHandles();
-    }
-
     createImageOverlay();
+    baseTiles.setOpacity(0.35);
 
-    const playZone = L.polygon([
-      overlayCorners.topLeft,
-      overlayCorners.topRight,
-      overlayCorners.bottomRight,
-      overlayCorners.bottomLeft,
-      overlayCorners.topLeft
-    ], {
+    const playZone = L.polygon(overlayPolygonLatLngs, {
       color: 'transparent',
       weight: 0,
       opacity: 0,
@@ -2213,13 +2040,15 @@
       console.assert(formatMeters(null) === '--', 'formatMeters should handle null');
       console.assert(formatMeters(25) === '25m', 'formatMeters should render meters');
       console.assert(pointInPolygon([
-        (overlayCorners.topLeft[0] + overlayCorners.bottomRight[0]) / 2,
-        (overlayCorners.topLeft[1] + overlayCorners.bottomRight[1]) / 2
+        (OVERLAY_NORTH + OVERLAY_SOUTH) / 2,
+        (OVERLAY_WEST + OVERLAY_EAST) / 2
       ], playZoneCoords) === true, 'center point should be inside derived overlay zone');
       console.assert(pointInPolygon([43.6165, -79.5780], playZoneCoords) === false, 'known exterior point should be outside');
       console.assert(Math.round(distanceMeters(43.617757, -79.575952, 43.617757, -79.575952)) === 0, 'distance to same point should be zero');
-      console.assert(Math.abs(overlayCorners.bottomLeft[0] - 43.613873) < 0.000001, 'bottom-left latitude should match provided coordinate');
-      console.assert(Math.abs(overlayCorners.bottomLeft[1] - (-79.575751)) < 0.000001, 'bottom-left longitude should match provided coordinate');
+      console.assert(Math.abs(OVERLAY_NORTH - 43.617318) < 0.000001, 'overlay north should match hard-coded value');
+      console.assert(Math.abs(OVERLAY_EAST - (-79.570958)) < 0.000001, 'overlay east should match hard-coded value');
+      console.assert(Math.abs(OVERLAY_SOUTH - 43.614356) < 0.000001, 'overlay south should match hard-coded value');
+      console.assert(Math.abs(OVERLAY_WEST - (-79.574962)) < 0.000001, 'overlay west should match hard-coded value');
       console.assert(LOCATIONS.length === 15, 'hard-coded stops should load 15 entries');
       console.assert(LOCATIONS[0].lat === 43.616701, 'hard-coded Bunny HQ should match uploaded json');
       setStopsVisibility(false);
@@ -2265,64 +2094,6 @@
       }, 2500);
     }
 
-    const overlayEditBtn = document.getElementById('overlayEditBtn');
-    const saveOverlayBtn = document.getElementById('saveOverlayBtn');
-    const exportOverlayBtn = document.getElementById('exportOverlayBtn');
-    const importOverlayBtn = document.getElementById('importOverlayBtn');
-    const importOverlayInput = document.getElementById('importOverlayInput');
-    const resetOverlayBtn = document.getElementById('resetOverlayBtn');
-    const overlayEditTip = document.getElementById('overlayEditTip');
-
-    if (overlayEditBtn) {
-      overlayEditBtn.onclick = () => {
-        overlayEditMode = !overlayEditMode;
-        overlayEditBtn.textContent = overlayEditMode ? '📐 Edit Overlay On' : '📐 Edit Overlay Off';
-        overlayEditTip.style.display = overlayEditMode ? 'block' : 'none';
-        if (overlayEditMode) {
-          addOverlayHandles();
-          setOverlayStatus('Overlay edit mode is on.');
-        } else {
-          clearOverlayHandles();
-          saveOverlayState();
-          setOverlayStatus('Overlay edit mode is off.');
-        }
-      };
-    }
-
-    if (saveOverlayBtn) {
-      saveOverlayBtn.onclick = () => {
-        saveOverlayState();
-        setOverlayStatus('Overlay saved on this device.');
-      };
-    }
-
-    if (exportOverlayBtn) {
-      exportOverlayBtn.onclick = async () => {
-        await exportOverlayJson();
-        setOverlayStatus('Overlay JSON downloaded.');
-      };
-    }
-
-    if (importOverlayBtn && importOverlayInput) {
-      importOverlayBtn.onclick = () => {
-        importOverlayInput.click();
-      };
-      importOverlayInput.onchange = async (e) => {
-        const file = e.target.files && e.target.files[0];
-        const ok = await importOverlayJsonFile(file);
-        if (ok) setOverlayStatus('Overlay JSON loaded.');
-        importOverlayInput.value = '';
-      };
-    }
-
-    if (resetOverlayBtn) {
-      resetOverlayBtn.onclick = () => {
-        resetOverlayState();
-        if (overlayEditMode) addOverlayHandles();
-        setOverlayStatus('Overlay reset to original position.');
-      };
-    }
-
-  </script>
+      </script>
 </body>
 </html>
