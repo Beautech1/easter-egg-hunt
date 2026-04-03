@@ -211,6 +211,32 @@
       margin: 10px 0 14px;
     }
 
+
+
+    #confettiLayer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 2600;
+    }
+
+    .confetti-piece {
+      position: absolute;
+      top: -12vh;
+      width: 10px;
+      height: 16px;
+      border-radius: 4px;
+      opacity: 0.95;
+      animation: confettiFall linear forwards;
+      will-change: transform, opacity;
+    }
+
+    @keyframes confettiFall {
+      0% { transform: translate3d(0,0,0) rotate(0deg) scale(1); opacity: 1; }
+      100% { transform: translate3d(var(--drift, 0px), 115vh, 0) rotate(var(--spin, 540deg)) scale(0.9); opacity: 0; }
+    }
+
     .leaflet-popup-content-wrapper { border-radius: 18px; }
 
     .location-btn {
@@ -366,6 +392,103 @@
       font-weight: 700;
     }
 
+    .heat-wrap {
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #fff, #f8fbff);
+      border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .heat-top {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:8px;
+      font-size:12px;
+      font-weight:700;
+      margin-bottom:6px;
+    }
+
+    .heat-track {
+      height: 10px;
+      background: #edf1f6;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .heat-bar {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #4aa8ff 0%, #7fd7ff 25%, #87f0c0 45%, #ffd74f 70%, #ff6fb5 100%);
+      transition: width 0.28s ease;
+    }
+
+    .win-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 3000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(25,20,35,0.86);
+      backdrop-filter: blur(6px);
+    }
+
+    .win-card {
+      width: min(560px, 100%);
+      background: linear-gradient(180deg, #ffffff, #fff6ff);
+      border-radius: 26px;
+      padding: 26px 22px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+
+    .win-card h2 {
+      margin: 0 0 8px;
+      font-size: 34px;
+      line-height: 1.05;
+    }
+
+    .win-grid {
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:10px;
+      margin:18px 0;
+    }
+
+    .win-stat {
+      padding: 12px 10px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #fff, #f6fbff);
+      border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .win-stat strong {
+      display:block;
+      font-size: 24px;
+      margin-bottom: 4px;
+    }
+
+
+
+    .overlay-handle {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.28);
+    }
+    .overlay-handle.corner { background: #ff6fb5; }
+    .overlay-handle.center { background: #4aa8ff; width: 22px; height: 22px; }
+    .leaflet-marker-icon { cursor: grab !important; }
+    .overlay-edit-tip {
+      margin-top: 8px;
+      font-size: 11px;
+      opacity: 0.75;
+    }
 
     @media (max-width: 800px) {
       .topbar {
@@ -408,11 +531,14 @@
         width: min(300px, calc(100vw - 20px));
         padding: 8px 10px;
       }
+      .win-card h2 { font-size: 28px; }
+      .win-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <div id="confettiLayer" aria-hidden="true"></div>
 
   <div class="panel topbar" id="topbar">
     <div class="topbar-header">
@@ -424,7 +550,18 @@
     </div>
     <div class="small">Walk inside the play zone, discover hidden places, solve clues, and collect 15 magical eggs.</div>
     <div class="tap-hint" id="tapHint"> </div>
+    <div class="overlay-edit-tip" id="overlayEditTip" style="display:none;">Pink dots resize the overlay. Blue dot moves the whole overlay. Changes save on this device.</div>
+    <div class="overlay-edit-tip" id="overlayStatus" style="display:none;"></div>
     <div class="player-chip" id="playerChip">Player: Adventurer</div>
+    <div class="heat-wrap">
+      <div class="heat-top">
+        <span>🎯 Hot / Cold</span>
+        <span id="heatLabel">Searching…</span>
+      </div>
+      <div class="heat-track">
+        <div class="heat-bar" id="heatBar"></div>
+      </div>
+    </div>
     <div class="stats">
       <div class="stat"><strong id="foundCount">0</strong><span>Eggs Found</span></div>
       <div class="stat"><strong id="totalCount">15</strong><span>Total Stops</span></div>
@@ -441,6 +578,12 @@
       <button class="ghost" id="closeAdminBtn">✖ Close Admin</button>
       <button class="secondary" id="showAllBtn">🙈 Hide Stops</button>
       <button class="secondary" id="overlayBtn">🖼️ Overlay On</button>
+      <button class="secondary" id="overlayEditBtn">📐 Edit Overlay Off</button>
+      <button class="ghost" id="saveOverlayBtn">💾 Save Overlay</button>
+      <button class="ghost" id="exportOverlayBtn">📤 Export Overlay JSON</button>
+      <button class="ghost" id="importOverlayBtn">📥 Import Overlay JSON</button>
+      <input id="importOverlayInput" type="file" accept="application/json,.json" style="display:none;" />
+      <button class="ghost" id="resetOverlayBtn">↺ Reset Overlay</button>
       <button class="secondary" id="editModeBtn">✏️ Edit Stops Off</button>
       <button class="ghost" id="exportStopsBtn">💾 Export Stops</button>
       <button class="ghost" id="importStopsBtn">📂 Import Stops</button>
@@ -497,6 +640,21 @@
     </div>
   </div>
 
+  <div class="win-screen" id="winScreen">
+    <div class="win-card">
+      <div style="font-size:58px; margin-bottom:8px;">🏆🥚✨</div>
+      <h2>You Won!</h2>
+      <div class="small" style="font-size:15px; opacity:0.95;">The Easter Realm has been completed.</div>
+      <div class="win-grid">
+        <div class="win-stat"><strong id="winEggs">0/0</strong><span>Eggs Found</span></div>
+        <div class="win-stat"><strong id="winTime">0:00</strong><span>Total Time</span></div>
+        <div class="win-stat"><strong id="winScore">100%</strong><span>Score</span></div>
+      </div>
+      <p id="winMessage" style="margin:0 0 18px;">Amazing job!</p>
+      <button id="playAgainBtn">Play Again</button>
+    </div>
+  </div>
+
   <script>
     const map = L.map('map', { zoomControl: true }).setView([43.617757, -79.575952], 18);
 
@@ -510,6 +668,10 @@
     const topRight = [43.617914, -79.570055];
     const bottomLeft = [43.613873, -79.575751];
 
+    const OVERLAY_STORAGE_KEY = 'easter_realm_overlay_v1';
+    const savedOverlay = JSON.parse(localStorage.getItem(OVERLAY_STORAGE_KEY) || 'null');
+
+
     function deriveOverlayCorners(topLeftPoint, topRightPoint, bottomLeftPoint) {
       const [lat1, lng1] = topLeftPoint;
       const [lat2, lng2] = topRightPoint;
@@ -522,13 +684,152 @@
       };
     }
 
-    const overlayCorners = deriveOverlayCorners(topLeft, topRight, bottomLeft);
+    let overlayCorners = savedOverlay || deriveOverlayCorners(topLeft, topRight, bottomLeft);
 
     let imageOverlay = null;
     let overlayEnabled = true;
+    let overlayEditMode = false;
+    let overlayHandleMarkers = [];
+
+    function saveOverlayState() {
+      localStorage.setItem(OVERLAY_STORAGE_KEY, JSON.stringify(overlayCorners));
+    }
+
+    function resetOverlayState() {
+      overlayCorners = deriveOverlayCorners(topLeft, topRight, bottomLeft);
+      saveOverlayState();
+      refreshOverlay();
+    }
+
+    function getOverlayExportData() {
+      return {
+        topLeft: overlayCorners.topLeft,
+        topRight: overlayCorners.topRight,
+        bottomLeft: overlayCorners.bottomLeft
+      };
+    }
+
+    async function exportOverlayJson() {
+      const payload = JSON.stringify(getOverlayExportData(), null, 2);
+      const fileName = 'easter_overlay_position.json';
+      const blob = new Blob([payload], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+      return true;
+    }
+
+    function applyOverlayImportData(data) {
+      if (!data || !Array.isArray(data.topLeft) || !Array.isArray(data.topRight) || !Array.isArray(data.bottomLeft)) {
+        throw new Error('Invalid overlay JSON format.');
+      }
+
+      overlayCorners = {
+        topLeft: [Number(data.topLeft[0]), Number(data.topLeft[1])],
+        topRight: [Number(data.topRight[0]), Number(data.topRight[1])],
+        bottomLeft: [Number(data.bottomLeft[0]), Number(data.bottomLeft[1])]
+      };
+
+      saveOverlayState();
+      refreshOverlay();
+    }
+
+    async function importOverlayJsonFile(file) {
+      if (!file) return false;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        applyOverlayImportData(data);
+        return true;
+      } catch (err) {
+        console.error('Import overlay failed:', err);
+        alert('That overlay JSON file could not be loaded.');
+        return false;
+      }
+    }
+
+    function clearOverlayHandles() {
+      overlayHandleMarkers.forEach(marker => map.removeLayer(marker));
+      overlayHandleMarkers = [];
+    }
+
+    function buildOverlayBounds() {
+      return L.latLngBounds([
+        overlayCorners.topLeft,
+        overlayCorners.topRight,
+        overlayCorners.bottomRight,
+        overlayCorners.bottomLeft
+      ]);
+    }
+
+    function createHandle(latlng, kind, onDrag) {
+      const marker = L.marker(latlng, {
+        draggable: true,
+        keyboard: false,
+        zIndexOffset: 2000,
+        icon: L.divIcon({
+          className: '',
+          html: `<div class="overlay-handle ${kind}"></div>`,
+          iconSize: kind === 'center' ? [22, 22] : [20, 20],
+          iconAnchor: kind === 'center' ? [11, 11] : [10, 10]
+        })
+      }).addTo(map);
+      marker.on('drag', onDrag);
+      marker.on('dragend', () => {
+        saveOverlayState();
+        refreshOverlay();
+      });
+      overlayHandleMarkers.push(marker);
+      return marker;
+    }
+
+    function addOverlayHandles() {
+      if (!overlayEditMode) return;
+      clearOverlayHandles();
+
+      createHandle(overlayCorners.topLeft, 'corner', (e) => {
+        overlayCorners.topLeft = [e.latlng.lat, e.latlng.lng];
+        overlayCorners.bottomRight = [overlayCorners.bottomLeft[0] + (overlayCorners.topRight[0] - overlayCorners.topLeft[0]), overlayCorners.bottomLeft[1] + (overlayCorners.topRight[1] - overlayCorners.topLeft[1])];
+        refreshOverlay(false);
+      });
+
+      createHandle(overlayCorners.topRight, 'corner', (e) => {
+        overlayCorners.topRight = [e.latlng.lat, e.latlng.lng];
+        overlayCorners.bottomRight = [overlayCorners.bottomLeft[0] + (overlayCorners.topRight[0] - overlayCorners.topLeft[0]), overlayCorners.bottomLeft[1] + (overlayCorners.topRight[1] - overlayCorners.topLeft[1])];
+        refreshOverlay(false);
+      });
+
+      createHandle(overlayCorners.bottomLeft, 'corner', (e) => {
+        overlayCorners.bottomLeft = [e.latlng.lat, e.latlng.lng];
+        overlayCorners.bottomRight = [overlayCorners.bottomLeft[0] + (overlayCorners.topRight[0] - overlayCorners.topLeft[0]), overlayCorners.bottomLeft[1] + (overlayCorners.topRight[1] - overlayCorners.topLeft[1])];
+        refreshOverlay(false);
+      });
+
+      const center = [
+        (overlayCorners.topLeft[0] + overlayCorners.topRight[0] + overlayCorners.bottomLeft[0] + overlayCorners.bottomRight[0]) / 4,
+        (overlayCorners.topLeft[1] + overlayCorners.topRight[1] + overlayCorners.bottomLeft[1] + overlayCorners.bottomRight[1]) / 4
+      ];
+
+      createHandle(center, 'center', (e) => {
+        const nextCenter = [e.latlng.lat, e.latlng.lng];
+        const latDiff = nextCenter[0] - center[0];
+        const lngDiff = nextCenter[1] - center[1];
+        overlayCorners = {
+          topLeft: [overlayCorners.topLeft[0] + latDiff, overlayCorners.topLeft[1] + lngDiff],
+          topRight: [overlayCorners.topRight[0] + latDiff, overlayCorners.topRight[1] + lngDiff],
+          bottomLeft: [overlayCorners.bottomLeft[0] + latDiff, overlayCorners.bottomLeft[1] + lngDiff],
+          bottomRight: [overlayCorners.bottomRight[0] + latDiff, overlayCorners.bottomRight[1] + lngDiff]
+        };
+        refreshOverlay(false);
+      });
+    }
 
     function createImageOverlay() {
-      if (imageOverlay) return imageOverlay;
+      if (imageOverlay) map.removeLayer(imageOverlay);
 
       if (L.imageOverlay && typeof L.imageOverlay.rotated === 'function') {
         imageOverlay = L.imageOverlay.rotated(
@@ -549,24 +850,38 @@
 
       imageOverlay.on('error', () => {
         overlayEnabled = false;
-        document.getElementById('overlayBtn').textContent = '🖼️ Overlay Missing';
+        const overlayBtn = document.getElementById('overlayBtn');
+        if (overlayBtn) overlayBtn.textContent = '🖼️ Overlay Missing';
         baseTiles.setOpacity(1);
       });
 
+      imageOverlay.addTo(map);
       return imageOverlay;
     }
 
-    createImageOverlay().addTo(map);
+    function refreshOverlay(updateHandles = true) {
+      overlayCorners.bottomRight = [overlayCorners.bottomLeft[0] + (overlayCorners.topRight[0] - overlayCorners.topLeft[0]), overlayCorners.bottomLeft[1] + (overlayCorners.topRight[1] - overlayCorners.topLeft[1])];
+      createImageOverlay();
+      if (playZone) {
+        playZone.setLatLngs([
+          overlayCorners.topLeft,
+          overlayCorners.topRight,
+          overlayCorners.bottomRight,
+          overlayCorners.bottomLeft
+        ]);
+      }
+      if (updateHandles) addOverlayHandles();
+    }
 
-    const playZoneCoords = [
+    createImageOverlay();
+
+    const playZone = L.polygon([
       overlayCorners.topLeft,
       overlayCorners.topRight,
       overlayCorners.bottomRight,
       overlayCorners.bottomLeft,
       overlayCorners.topLeft
-    ];
-
-    const playZone = L.polygon(playZoneCoords, {
+    ], {
       color: 'transparent',
       weight: 0,
       opacity: 0,
@@ -574,224 +889,219 @@
       fillOpacity: 0
     }).addTo(map);
 
-    map.fitBounds(L.latLngBounds([
-      overlayCorners.topLeft,
-      overlayCorners.topRight,
-      overlayCorners.bottomRight,
-      overlayCorners.bottomLeft
-    ]), { padding: [25, 25] });
+    map.fitBounds(buildOverlayBounds(), { padding: [25, 25] });
 
     const LOCATIONS = [
-      {
-            "id": 1,
-            "name": "Bunny HQ",
-            "lat": 43.616701,
-            "lng": -79.571657,
-            "zone": "Home Base",
-            "icon": "🐰",
-            "type": "intro",
-            "challenge": "The Easter eggs have scattered across the realm. Your first task: step into adventure and greet the Bunny Keeper.",
-            "clue": "Look for the path that leads away from home and into the realm.",
-            "reward": "Starter Egg",
-            "radius": 24,
-            "answer": ""
-      },
-      {
-            "id": 2,
-            "name": "Talking Mailbox",
-            "lat": 43.614793,
-            "lng": -79.573406,
-            "zone": "Home Base",
-            "icon": "📬",
-            "type": "riddle",
-            "challenge": "I hold secrets but do not talk. Tap to wake me and hear the whisper of the trail.",
-            "clue": "What receives messages but never walks?",
-            "reward": "Cherry Egg",
-            "radius": 20,
-            "answer": "mailbox"
-      },
-      {
-            "id": 3,
-            "name": "Candy Compass",
-            "lat": 43.615945,
-            "lng": -79.572065,
-            "zone": "Pathway",
-            "icon": "🧭",
-            "type": "direction",
-            "challenge": "The compass twirls in sugar sparkles and points toward the big open field.",
-            "clue": "Head toward the grassy world where the bunny kingdom begins.",
-            "reward": "Mint Egg",
-            "radius": 20,
-            "answer": ""
-      },
-      {
-            "id": 4,
-            "name": "Whispering Tree",
-            "lat": 43.614403,
-            "lng": -79.572625,
-            "zone": "Enchanted Forest",
-            "icon": "🌳",
-            "type": "listen",
-            "challenge": "The old tree tells you: “Find the nest where treasure rests.”",
-            "clue": "Nearby lies a place where little treasures sleep.",
-            "reward": "Forest Egg",
-            "radius": 18,
-            "answer": ""
-      },
-      {
-            "id": 5,
-            "name": "Hidden Nest",
-            "lat": 43.617,
-            "lng": -79.572861,
-            "zone": "Enchanted Forest",
-            "icon": "🪺",
-            "type": "quiz",
-            "challenge": "Which animal is famous for hiding Easter eggs? A) Fox B) Bunny C) Turtle",
-            "clue": "Follow the footprints to the next secret.",
-            "reward": "Nest Egg",
-            "radius": 18,
-            "answer": "bunny"
-      },
-      {
-            "id": 6,
-            "name": "Golden Carrot Patch",
-            "lat": 43.617068,
-            "lng": -79.573084,
-            "zone": "Golden Field",
-            "icon": "🥕",
-            "type": "collect",
-            "challenge": "Collect 3 magic carrots by tapping the carrot button three times.",
-            "clue": "Footprints bounce toward play and laughter.",
-            "reward": "Carrot Egg",
-            "radius": 22,
-            "answer": ""
-      },
-      {
-            "id": 7,
-            "name": "Bunny Footprint Trail",
-            "lat": 43.616736,
-            "lng": -79.572271,
-            "zone": "Golden Field",
-            "icon": "🐾",
-            "type": "trail",
-            "challenge": "The tracks point to a place of slides, swings, and climbing fun.",
-            "clue": "The playground kingdom awaits.",
-            "reward": "Trail Egg",
-            "radius": 18,
-            "answer": ""
-      },
-      {
-            "id": 8,
-            "name": "Slide of Secrets",
-            "lat": 43.616627,
-            "lng": -79.571936,
-            "zone": "Playground Kingdom",
-            "icon": "🛝",
-            "type": "action",
-            "challenge": "Bonus challenge: go on the slide in real life, then tap “Done”.",
-            "clue": "The swings nearby are moving with magic.",
-            "reward": "Slide Egg",
-            "radius": 18,
-            "answer": ""
-      },
-      {
-            "id": 9,
-            "name": "Swing Challenge",
-            "lat": 43.616889,
-            "lng": -79.571976,
-            "zone": "Playground Kingdom",
-            "icon": "🎠",
-            "type": "timer",
-            "challenge": "Stay in this zone for 10 seconds to calm the fluttering egg spirits.",
-            "clue": "A coded message hangs nearby.",
-            "reward": "Sky Egg",
-            "radius": 18,
-            "answer": ""
-      },
-      {
-            "id": 10,
-            "name": "Monkey Bar Code",
-            "lat": 43.616247,
-            "lng": -79.585669,
-            "zone": "Playground Kingdom",
-            "icon": "🧩",
-            "type": "scramble",
-            "challenge": "Unscramble this word: YBUNN",
-            "clue": "A guardian protects the next egg.",
-            "reward": "Puzzle Egg",
-            "radius": 18,
-            "answer": "bunny"
-      },
-      {
-            "id": 11,
-            "name": "Egg Guardian",
-            "lat": 43.61725,
-            "lng": -79.572593,
-            "zone": "Playground Kingdom",
-            "icon": "🛡️",
-            "type": "quiz",
-            "challenge": "What color do you get by mixing red and yellow?",
-            "clue": "Return toward the long field where colors fall from the sky.",
-            "reward": "Guardian Egg",
-            "radius": 18,
-            "answer": "orange"
-      },
-      {
-            "id": 12,
-            "name": "Rainbow Drop Zone",
-            "lat": 43.614516,
-            "lng": -79.572829,
-            "zone": "Golden Field",
-            "icon": "🌈",
-            "type": "tap",
-            "challenge": "Tap the falling egg before it escapes. Ready? Tap “Catch Egg”.",
-            "clue": "One egg is fast. Catch it if you can.",
-            "reward": "Rainbow Egg",
-            "radius": 18,
-            "answer": ""
-      },
-      {
-            "id": 13,
-            "name": "Speed Egg",
-            "lat": 43.615661,
-            "lng": -79.572387,
-            "zone": "Golden Field",
-            "icon": "⚡",
-            "type": "speed",
-            "challenge": "Reach this point and claim the egg before the timer ends. Tap “Start 8s Timer”.",
-            "clue": "A giant invisible egg hides nearby in the grass.",
-            "reward": "Lightning Egg",
-            "radius": 18,
-            "answer": ""
-      },
-      {
-            "id": 14,
-            "name": "Giant Invisible Egg",
-            "lat": 43.61714,
-            "lng": -79.572625,
-            "zone": "Golden Field",
-            "icon": "👻",
-            "type": "search",
-            "challenge": "The giant egg cannot be seen, only sensed. Walk around and stand still to reveal it.",
-            "clue": "All clues lead back to the final treasure.",
-            "reward": "Ghost Egg",
-            "radius": 28,
-            "answer": ""
-      },
-      {
-            "id": 15,
-            "name": "Golden Egg Temple",
-            "lat": 43.615272,
-            "lng": -79.572884,
-            "zone": "Final Shrine",
-            "icon": "🥇",
-            "type": "final",
-            "challenge": "Final riddle: Who hid the eggs all over the realm?",
-            "clue": "You have completed the hunt!",
-            "reward": "Golden Egg",
-            "radius": 20,
-            "answer": "bunny"
-      }
+  {
+    "id": 1,
+    "name": "Bunny HQ",
+    "lat": 43.616701,
+    "lng": -79.571657,
+    "zone": "Home Base",
+    "icon": "🐰",
+    "type": "intro",
+    "challenge": "The Easter eggs have scattered across the realm. Your first task: step into adventure and greet the Bunny Keeper.",
+    "clue": "Look for the path that leads away from home and into the realm.",
+    "reward": "Starter Egg",
+    "radius": 24,
+    "answer": ""
+  },
+  {
+    "id": 2,
+    "name": "Talking Mailbox",
+    "lat": 43.614793,
+    "lng": -79.573406,
+    "zone": "Home Base",
+    "icon": "📬",
+    "type": "riddle",
+    "challenge": "I hold secrets but do not talk. Tap to wake me and hear the whisper of the trail.",
+    "clue": "What receives messages but never walks?",
+    "reward": "Cherry Egg",
+    "radius": 20,
+    "answer": "mailbox"
+  },
+  {
+    "id": 3,
+    "name": "Candy Compass",
+    "lat": 43.615945,
+    "lng": -79.572065,
+    "zone": "Pathway",
+    "icon": "🧭",
+    "type": "direction",
+    "challenge": "The compass twirls in sugar sparkles and points toward the big open field.",
+    "clue": "Head toward the grassy world where the bunny kingdom begins.",
+    "reward": "Mint Egg",
+    "radius": 20,
+    "answer": ""
+  },
+  {
+    "id": 4,
+    "name": "Whispering Tree",
+    "lat": 43.614646,
+    "lng": -79.5724,
+    "zone": "Enchanted Forest",
+    "icon": "🌳",
+    "type": "listen",
+    "challenge": "The old tree tells you: “Find the nest where treasure rests.”",
+    "clue": "Nearby lies a place where little treasures sleep.",
+    "reward": "Forest Egg",
+    "radius": 18,
+    "answer": ""
+  },
+  {
+    "id": 5,
+    "name": "Hidden Nest",
+    "lat": 43.617013,
+    "lng": -79.572805,
+    "zone": "Enchanted Forest",
+    "icon": "🪺",
+    "type": "quiz",
+    "challenge": "Which animal is famous for hiding Easter eggs? A) Fox B) Bunny C) Turtle",
+    "clue": "Follow the footprints to the next secret.",
+    "reward": "Nest Egg",
+    "radius": 18,
+    "answer": "bunny"
+  },
+  {
+    "id": 6,
+    "name": "Golden Carrot Patch",
+    "lat": 43.616941,
+    "lng": -79.57258,
+    "zone": "Golden Field",
+    "icon": "🥕",
+    "type": "collect",
+    "challenge": "Collect 3 magic carrots by tapping the carrot button three times.",
+    "clue": "Footprints bounce toward play and laughter.",
+    "reward": "Carrot Egg",
+    "radius": 22,
+    "answer": ""
+  },
+  {
+    "id": 7,
+    "name": "Bunny Footprint Trail",
+    "lat": 43.616736,
+    "lng": -79.572271,
+    "zone": "Golden Field",
+    "icon": "🐾",
+    "type": "trail",
+    "challenge": "The tracks point to a place of slides, swings, and climbing fun.",
+    "clue": "The playground kingdom awaits.",
+    "reward": "Trail Egg",
+    "radius": 18,
+    "answer": ""
+  },
+  {
+    "id": 8,
+    "name": "Slide of Secrets",
+    "lat": 43.616736,
+    "lng": -79.571984,
+    "zone": "Playground Kingdom",
+    "icon": "🛝",
+    "type": "action",
+    "challenge": "Bonus challenge: go on the slide in real life, then tap “Done”.",
+    "clue": "The swings nearby are moving with magic.",
+    "reward": "Slide Egg",
+    "radius": 18,
+    "answer": ""
+  },
+  {
+    "id": 9,
+    "name": "Swing Challenge",
+    "lat": 43.616889,
+    "lng": -79.571976,
+    "zone": "Playground Kingdom",
+    "icon": "🎠",
+    "type": "timer",
+    "challenge": "Stay in this zone for 10 seconds to calm the fluttering egg spirits.",
+    "clue": "A coded message hangs nearby.",
+    "reward": "Sky Egg",
+    "radius": 18,
+    "answer": ""
+  },
+  {
+    "id": 10,
+    "name": "Monkey Bar Code",
+    "lat": 43.616247,
+    "lng": -79.585669,
+    "zone": "Playground Kingdom",
+    "icon": "🧩",
+    "type": "scramble",
+    "challenge": "Unscramble this word: YBUNN",
+    "clue": "A guardian protects the next egg.",
+    "reward": "Puzzle Egg",
+    "radius": 18,
+    "answer": "bunny"
+  },
+  {
+    "id": 11,
+    "name": "Egg Guardian",
+    "lat": 43.616576,
+    "lng": -79.57196,
+    "zone": "Playground Kingdom",
+    "icon": "🛡️",
+    "type": "quiz",
+    "challenge": "What color do you get by mixing red and yellow?",
+    "clue": "Return toward the long field where colors fall from the sky.",
+    "reward": "Guardian Egg",
+    "radius": 18,
+    "answer": "orange"
+  },
+  {
+    "id": 12,
+    "name": "Rainbow Drop Zone",
+    "lat": 43.614737,
+    "lng": -79.572601,
+    "zone": "Golden Field",
+    "icon": "🌈",
+    "type": "tap",
+    "challenge": "Tap the falling egg before it escapes. Ready? Tap “Catch Egg”.",
+    "clue": "One egg is fast. Catch it if you can.",
+    "reward": "Rainbow Egg",
+    "radius": 18,
+    "answer": ""
+  },
+  {
+    "id": 13,
+    "name": "Speed Egg",
+    "lat": 43.615669,
+    "lng": -79.572396,
+    "zone": "Golden Field",
+    "icon": "⚡",
+    "type": "speed",
+    "challenge": "Reach this point and claim the egg before the timer ends. Tap “Start 8s Timer”.",
+    "clue": "A giant invisible egg hides nearby in the grass.",
+    "reward": "Lightning Egg",
+    "radius": 18,
+    "answer": ""
+  },
+  {
+    "id": 14,
+    "name": "Giant Invisible Egg",
+    "lat": 43.61711,
+    "lng": -79.572617,
+    "zone": "Golden Field",
+    "icon": "👻",
+    "type": "search",
+    "challenge": "The giant egg cannot be seen, only sensed. Walk around and stand still to reveal it.",
+    "clue": "All clues lead back to the final treasure.",
+    "reward": "Ghost Egg",
+    "radius": 28,
+    "answer": ""
+  },
+  {
+    "id": 15,
+    "name": "Golden Egg Temple",
+    "lat": 43.615272,
+    "lng": -79.572884,
+    "zone": "Final Shrine",
+    "icon": "🥇",
+    "type": "final",
+    "challenge": "Final riddle: Who hid the eggs all over the realm?",
+    "clue": "You have completed the hunt!",
+    "reward": "Golden Egg",
+    "radius": 20,
+    "answer": "bunny"
+  }
 ];
 
     const STORAGE_KEY = 'easter_realm_game_v2';
@@ -821,7 +1131,11 @@
       bgMusicTimer: null,
       proximityTimer: null,
       proximityTickMs: null,
-      melodyStep: 0
+      melodyStep: 0,
+      lastZone: null,
+      radarPulse: null,
+      radarCircle: null,
+      winShown: false
     };
 
     document.getElementById('playerChip').textContent = `Player: ${state.playerName}`;
@@ -943,6 +1257,45 @@
       playTone(783.99, 0.18, 0.04, 'triangle', 0.16);
     }
 
+    function playCelebrationMusic() {
+      if (!state.musicEnabled) return;
+      const notes = [783.99, 987.77, 1174.66, 1567.98, 1318.51, 1760];
+      notes.forEach((freq, i) => {
+        playTone(freq, 0.14 + (i * 0.01), 0.045, i % 2 === 0 ? 'triangle' : 'square', i * 0.1);
+      });
+      [391.99, 523.25, 659.25].forEach((freq, i) => {
+        playTone(freq, 0.34, 0.02, 'sine', 0.04 + (i * 0.12));
+      });
+    }
+
+    function launchConfetti(burstCount = 56) {
+      const layer = document.getElementById('confettiLayer');
+      if (!layer) return;
+      const palette = ['#ff6fb5', '#ffd74f', '#7fd7ff', '#87f0c0', '#b992ff', '#ffffff'];
+      for (let i = 0; i < burstCount; i += 1) {
+        const piece = document.createElement('div');
+        piece.className = 'confetti-piece';
+        piece.style.left = `${Math.random() * 100}vw`;
+        piece.style.background = palette[i % palette.length];
+        piece.style.width = `${8 + Math.random() * 8}px`;
+        piece.style.height = `${10 + Math.random() * 14}px`;
+        piece.style.opacity = String(0.7 + Math.random() * 0.3);
+        piece.style.setProperty('--drift', `${-110 + Math.random() * 220}px`);
+        piece.style.setProperty('--spin', `${360 + Math.random() * 900}deg`);
+        piece.style.animationDuration = `${1.8 + Math.random() * 1.8}s`;
+        piece.style.transform = `translate3d(0,0,0) rotate(${Math.random() * 180}deg)`;
+        layer.appendChild(piece);
+        setTimeout(() => piece.remove(), 4200);
+      }
+    }
+
+    function celebrateCorrectAnswer(rewardName = 'Easter Egg') {
+      launchConfetti();
+      playCelebrationMusic();
+      const tray = document.getElementById('unlockTrayText');
+      if (tray) tray.textContent = `🎉 Correct! You won the ${rewardName}!`;
+    }
+
     function playUnlockSound() {
       if (!state.musicEnabled) return;
       playTone(740, 0.08, 0.03, 'square', 0);
@@ -1038,9 +1391,12 @@
         root.style.setProperty('--player-pulse-scale', '1.35');
         updateUnlockTray(null, null);
         stopProximityBeep();
+        updateHeatMeter(null, null);
         if (!state.adminVisible) proximityNote.textContent = '';
         return;
       }
+
+      maybePlayZoneSound(loc.zone);
 
       const safeDistance = Math.max(0, distance);
       const detectionEdge = Math.max(loc.radius * 3, 65);
@@ -1049,6 +1405,7 @@
       const pulseScale = (1.25 + (ratio * 0.65)).toFixed(2);
       root.style.setProperty('--player-pulse-duration', pulseDuration);
       root.style.setProperty('--player-pulse-scale', pulseScale);
+      updateHeatMeter(safeDistance, loc.radius);
 
       if (!state.showAllStops) {
         if (safeDistance <= loc.radius) {
@@ -1070,6 +1427,79 @@
         updateUnlockTray(loc, safeDistance);
         stopProximityBeep();
       }
+    }
+
+
+    function formatElapsedTime(startIso) {
+      if (!startIso) return '0:00';
+      const totalSeconds = Math.max(0, Math.floor((Date.now() - new Date(startIso).getTime()) / 1000));
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function updateHeatMeter(distance, radius) {
+      const bar = document.getElementById('heatBar');
+      const label = document.getElementById('heatLabel');
+      if (!bar || !label) return;
+      if (!Number.isFinite(distance) || !Number.isFinite(radius)) {
+        bar.style.width = '0%';
+        label.textContent = 'Searching…';
+        return;
+      }
+      const maxDistance = Math.max(radius * 3, 65);
+      const percent = Math.max(0, Math.min(1, 1 - (distance / maxDistance)));
+      bar.style.width = `${Math.round(percent * 100)}%`;
+      if (distance <= radius) label.textContent = 'HOT';
+      else if (distance <= radius * 1.5) label.textContent = 'Warm';
+      else if (distance <= radius * 2.2) label.textContent = 'Cool';
+      else label.textContent = 'Cold';
+    }
+
+    function getZoneSoundProfile(zone = '') {
+      const z = String(zone).toLowerCase();
+      if (z.includes('forest')) return { root: 220, accent: 277.18, wave: 'sine' };
+      if (z.includes('playground')) return { root: 523.25, accent: 659.25, wave: 'square' };
+      if (z.includes('final')) return { root: 783.99, accent: 987.77, wave: 'triangle' };
+      if (z.includes('golden')) return { root: 392.0, accent: 523.25, wave: 'triangle' };
+      return { root: 329.63, accent: 440.0, wave: 'sine' };
+    }
+
+    function playZoneSound(zone) {
+      if (!state.musicEnabled) return;
+      const profile = getZoneSoundProfile(zone);
+      playTone(profile.root, 0.13, 0.025, profile.wave, 0);
+      playTone(profile.accent, 0.16, 0.02, profile.wave, 0.08);
+    }
+
+    function maybePlayZoneSound(zone) {
+      if (!zone) return;
+      if (state.lastZone === zone) return;
+      state.lastZone = zone;
+      playZoneSound(zone);
+    }
+
+    function startRadarPulse() {
+      if (state.radarPulse) return;
+      let pulseRadius = 5;
+      let direction = 1;
+      state.radarPulse = setInterval(() => {
+        if (!state.radarCircle) return;
+        pulseRadius += direction * 1.4;
+        if (pulseRadius >= 18) direction = -1;
+        if (pulseRadius <= 5) direction = 1;
+        state.radarCircle.setRadius(pulseRadius);
+      }, 120);
+    }
+
+    function showWinScreen() {
+      if (state.winShown) return;
+      state.winShown = true;
+      document.getElementById('winEggs').textContent = `${state.found.size}/${LOCATIONS.length}`;
+      document.getElementById('winTime').textContent = formatElapsedTime(state.startedAt);
+      document.getElementById('winScore').textContent = '100%';
+      document.getElementById('winMessage').textContent = `Amazing job, ${state.playerName}! You completed the whole Easter hunt.`;
+      document.getElementById('winScreen').style.display = 'flex';
     }
 
     function updateStats() {
@@ -1137,6 +1567,7 @@
       if (overlayEnabled && imageOverlay && map.hasLayer(imageOverlay)) imageOverlay.bringToFront();
       markers.forEach(m => { if (map.hasLayer(m.marker)) m.marker.bringToFront(); });
       if (state.accuracyCircle && map.hasLayer(state.accuracyCircle)) state.accuracyCircle.bringToBack();
+      if (state.radarCircle && map.hasLayer(state.radarCircle)) state.radarCircle.bringToBack();
       if (state.userMarker && map.hasLayer(state.userMarker)) state.userMarker.bringToFront();
     }
 
@@ -1320,9 +1751,9 @@
       updateStats();
       updateProximityFeedback();
       if (state.found.size === LOCATIONS.length) {
-        setTimeout(() => {
-          alert(`🎉 Amazing, ${state.playerName}! You found all ${LOCATIONS.length} Easter eggs in the Lost Easter Realm!`);
-        }, 250);
+        launchConfetti(110);
+        playCelebrationMusic();
+        setTimeout(showWinScreen, 220);
       }
     }
 
@@ -1360,6 +1791,7 @@
     function runInteraction(loc) {
       switch (loc.type) {
         case 'intro':
+          celebrateCorrectAnswer(loc.reward);
           alert(`🐰 ${loc.challenge}\n\nClue: ${loc.clue}`);
           markFound(loc.id);
           break;
@@ -1369,6 +1801,7 @@
         case 'final': {
           const response = prompt(`${loc.challenge}\n\nType your answer:`) || '';
           if (response.trim().toLowerCase() === String(loc.answer || '').toLowerCase()) {
+            celebrateCorrectAnswer(loc.reward);
             alert(`Correct! You earned the ${loc.reward}.\n\nNext clue: ${loc.clue}`);
             markFound(loc.id);
           } else {
@@ -1380,6 +1813,7 @@
         case 'listen':
         case 'trail':
         case 'search':
+          celebrateCorrectAnswer(loc.reward);
           alert(`${loc.challenge}\n\nNext clue: ${loc.clue}`);
           markFound(loc.id);
           break;
@@ -1391,6 +1825,7 @@
             taps += 1;
           }
           if (taps >= 3) {
+            celebrateCorrectAnswer(loc.reward);
             alert(`You gathered all 3 carrots and won the ${loc.reward}!\n\n${loc.clue}`);
             markFound(loc.id);
           } else {
@@ -1401,6 +1836,7 @@
         case 'action': {
           const ok = confirm(`${loc.challenge}\n\nPress OK when completed.`);
           if (ok) {
+            celebrateCorrectAnswer(loc.reward);
             alert(`Great job! You earned the ${loc.reward}.\n\n${loc.clue}`);
             markFound(loc.id);
           }
@@ -1424,6 +1860,7 @@
             if (count <= 0) {
               clearInterval(interval);
               state.timerRunning = false;
+              celebrateCorrectAnswer(loc.reward);
               alert(`⏱️ Success! You stayed in the magic zone and earned the ${loc.reward}.\n\n${loc.clue}`);
               markFound(loc.id);
             }
@@ -1433,6 +1870,7 @@
         case 'tap': {
           const ok = confirm('🥚 Tap OK to catch the falling egg!');
           if (ok) {
+            celebrateCorrectAnswer(loc.reward);
             alert(`Caught it! You won the ${loc.reward}.\n\n${loc.clue}`);
             markFound(loc.id);
           }
@@ -1452,6 +1890,7 @@
             count -= 1;
             if (count <= 0) {
               clearInterval(interval);
+              celebrateCorrectAnswer(loc.reward);
               alert(`⚡ You beat the speed challenge and earned the ${loc.reward}!\n\n${loc.clue}`);
               markFound(loc.id);
             }
@@ -1482,6 +1921,20 @@
       } else {
         state.accuracyCircle.setLatLng([lat, lng]);
         state.accuracyCircle.setRadius(accuracy || 10);
+      }
+
+      if (!state.radarCircle) {
+        state.radarCircle = L.circle([lat, lng], {
+          radius: 8,
+          color: '#7fd7ff',
+          fillColor: '#7fd7ff',
+          fillOpacity: 0.06,
+          weight: 2,
+          opacity: 0.55
+        }).addTo(map);
+        startRadarPulse();
+      } else {
+        state.radarCircle.setLatLng([lat, lng]);
       }
 
       state.inZone = pointInPolygon([lat, lng], playZoneCoords);
@@ -1587,6 +2040,10 @@
     });
     document.getElementById('unlockNearestBtn').addEventListener('click', () => {
       if (state.nearestUnlockId) window.handleLocationAction(state.nearestUnlockId);
+    });
+    document.getElementById('playAgainBtn').addEventListener('click', () => {
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
     });
 
     document.getElementById('showAllBtn').addEventListener('click', () => setStopsVisibility(!state.showAllStops));
@@ -1797,6 +2254,75 @@
       setTimeout(() => { ensureAudio(); startBackgroundMusic(); }, 400);
     }
     runSelfTests();
+    function setOverlayStatus(message) {
+      const el = document.getElementById('overlayStatus');
+      if (!el) return;
+      el.style.display = 'block';
+      el.textContent = message;
+      clearTimeout(setOverlayStatus._timer);
+      setOverlayStatus._timer = setTimeout(() => {
+        el.style.display = 'none';
+      }, 2500);
+    }
+
+    const overlayEditBtn = document.getElementById('overlayEditBtn');
+    const saveOverlayBtn = document.getElementById('saveOverlayBtn');
+    const exportOverlayBtn = document.getElementById('exportOverlayBtn');
+    const importOverlayBtn = document.getElementById('importOverlayBtn');
+    const importOverlayInput = document.getElementById('importOverlayInput');
+    const resetOverlayBtn = document.getElementById('resetOverlayBtn');
+    const overlayEditTip = document.getElementById('overlayEditTip');
+
+    if (overlayEditBtn) {
+      overlayEditBtn.onclick = () => {
+        overlayEditMode = !overlayEditMode;
+        overlayEditBtn.textContent = overlayEditMode ? '📐 Edit Overlay On' : '📐 Edit Overlay Off';
+        overlayEditTip.style.display = overlayEditMode ? 'block' : 'none';
+        if (overlayEditMode) {
+          addOverlayHandles();
+          setOverlayStatus('Overlay edit mode is on.');
+        } else {
+          clearOverlayHandles();
+          saveOverlayState();
+          setOverlayStatus('Overlay edit mode is off.');
+        }
+      };
+    }
+
+    if (saveOverlayBtn) {
+      saveOverlayBtn.onclick = () => {
+        saveOverlayState();
+        setOverlayStatus('Overlay saved on this device.');
+      };
+    }
+
+    if (exportOverlayBtn) {
+      exportOverlayBtn.onclick = async () => {
+        await exportOverlayJson();
+        setOverlayStatus('Overlay JSON downloaded.');
+      };
+    }
+
+    if (importOverlayBtn && importOverlayInput) {
+      importOverlayBtn.onclick = () => {
+        importOverlayInput.click();
+      };
+      importOverlayInput.onchange = async (e) => {
+        const file = e.target.files && e.target.files[0];
+        const ok = await importOverlayJsonFile(file);
+        if (ok) setOverlayStatus('Overlay JSON loaded.');
+        importOverlayInput.value = '';
+      };
+    }
+
+    if (resetOverlayBtn) {
+      resetOverlayBtn.onclick = () => {
+        resetOverlayState();
+        if (overlayEditMode) addOverlayHandles();
+        setOverlayStatus('Overlay reset to original position.');
+      };
+    }
+
   </script>
 </body>
 </html>
