@@ -102,7 +102,6 @@
     </div>
   </div>
 
-
   <div id="map"></div>
 
   <div id="bottomPanel">
@@ -244,6 +243,8 @@ let addMode = false;
 let map, userMarker, accuracyCircle;
 let musicStarted = false;
 let audioCtx = null;
+let currentHeading = null;
+let orientationEnabled = false;
 let userLatLng = null;
 let eggMarkers = [];
 let nearestAvailableEgg = null;
@@ -253,8 +254,6 @@ let titleTapTimer = null;
 function distanceMeters(a,b){ return map.distance(a,b); }
 function getPlayerStorageKey(){ return 'egg_hunt_captures_' + playerName.toLowerCase().replace(/\s+/g,'_'); }
 function escapeHtml(text){ return String(text).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;'); }
-
-
 
 function askPlayerName(){
   const saved = localStorage.getItem('egg_hunt_player_name') || '';
@@ -454,6 +453,7 @@ function stopBackgroundTune(){
 
 function applyMapRotation(heading){
   if (!map || !Number.isFinite(heading)) return;
+  currentHeading = heading;
   const pane = map.getPane('mapPane');
   if (!pane) return;
   pane.style.transformOrigin = '50% 50%';
