@@ -87,6 +87,14 @@
       #bottomPanel{left:8px;right:8px;bottom:8px;padding:10px}
       .pill{font-size:12px}
       button{font-size:13px}
+      #map,
+      #map .leaflet-map-pane,
+      #map .leaflet-overlay-pane,
+      #map .leaflet-marker-pane,
+      #map .leaflet-shadow-pane,
+      #map .leaflet-popup-pane{
+        transform:none !important;
+      }
     }
   </style>
 </head>
@@ -243,8 +251,6 @@ let addMode = false;
 let map, userMarker, accuracyCircle;
 let musicStarted = false;
 let audioCtx = null;
-let currentHeading = null;
-let orientationEnabled = false;
 let userLatLng = null;
 let eggMarkers = [];
 let nearestAvailableEgg = null;
@@ -626,7 +632,6 @@ function initMap(){
         const lng = pos.coords.longitude;
         const accuracy = pos.coords.accuracy || 0;
         userLatLng = L.latLng(lat, lng);
-        if (typeof pos.coords.heading === 'number' && !Number.isNaN(pos.coords.heading)) applyMapRotation(pos.coords.heading);
 
         if (!userMarker) {
           userMarker = L.marker(userLatLng, { icon: makeGpsIcon(false) }).addTo(map);
@@ -646,10 +651,10 @@ function initMap(){
   }
 }
 
-document.getElementById('captureBtn').addEventListener('click', () => { startMusicOnce(); tryEnableDeviceOrientation(); captureNearestEgg(); });
+document.getElementById('captureBtn').addEventListener('click', () => { startMusicOnce(); captureNearestEgg(); });
 document.getElementById('musicBtn').addEventListener('click', (e) => { e.stopPropagation(); toggleMusic(); });
-document.addEventListener('click', () => { startMusicOnce(); tryEnableDeviceOrientation(); }, { once: true, passive: true });
-document.addEventListener('touchstart', () => { startMusicOnce(); tryEnableDeviceOrientation(); }, { once: true, passive: true });
+document.addEventListener('click', () => { startMusicOnce(); }, { once: true, passive: true });
+document.addEventListener('touchstart', () => { startMusicOnce(); }, { once: true, passive: true });
 document.getElementById('centerBtn').addEventListener('click', () => { if (userLatLng) map.setView(userLatLng, 19); });
 document.getElementById('changePlayerBtn').addEventListener('click', () => { askPlayerName(); renderEggs(); updateProximity(); });
 document.getElementById('resetPlayerBtn').addEventListener('click', resetCurrentPlayerCaptures);
